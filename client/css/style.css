@@ -1,0 +1,272 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+* { box-sizing: border-box; }
+
+body {
+  background: #08041a;
+  margin: 0;
+  overflow: hidden;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+#canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Scene overlay (scanlines + vignette) ──────────── */
+#scene-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+#scene-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 80% at 40% 50%, transparent 40%, rgba(0,0,0,0.65) 100%);
+}
+#scene-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(to bottom, transparent 0px, transparent 2px, rgba(0,0,0,0.05) 2px, rgba(0,0,0,0.05) 4px);
+}
+
+/* ── LIVE badge ─────────────────────────────────────── */
+#live-badge {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 100;
+}
+#live-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff2244;
+  box-shadow: 0 0 12px #ff2244, 0 0 24px rgba(255,34,68,0.4);
+  animation: live-pulse 1.5s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.85); }
+}
+#live-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ff2244;
+  letter-spacing: 0.2em;
+  text-shadow: 0 0 8px rgba(255,34,68,0.5);
+}
+
+/* ── State indicator ────────────────────────────────── */
+#state-indicator {
+  position: fixed;
+  top: 48px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(180,160,255,0.8);
+  z-index: 100;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+#state-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #6633cc;
+  box-shadow: 0 0 12px #6633cc;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+#state-indicator.thinking #state-dot { background: #9955ff; box-shadow: 0 0 16px #9955ff; }
+#state-indicator.typing   #state-dot { background: #8866ff; box-shadow: 0 0 14px #8866ff; }
+#state-indicator.speaking #state-dot { background: #aa88ff; box-shadow: 0 0 18px #aa88ff; }
+#state-indicator.executing #state-dot { background: #00ccff; box-shadow: 0 0 16px #00ccff; }
+
+/* ── Screen panel (top right, PERMANENT) ───────────── */
+#screen {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 380px;
+  max-height: calc(100vh - 320px);
+  background: rgba(12,6,28,0.94);
+  border: 1px solid rgba(136,102,255,0.35);
+  border-radius: 10px;
+  box-shadow: 0 0 30px rgba(136,102,255,0.15), 0 0 60px rgba(136,102,255,0.06), inset 0 1px 0 rgba(255,255,255,0.04);
+  font-size: 12px;
+  z-index: 30;
+  pointer-events: none;
+  opacity: 1;
+  backdrop-filter: blur(6px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#screen-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(136,102,255,0.2);
+  color: rgba(180,160,255,0.7);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+#screen-dots {
+  display: flex;
+  gap: 5px;
+}
+#screen-dots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  opacity: 0.7;
+}
+#screen-title {
+  flex: 1;
+  text-align: center;
+  color: rgba(180,160,255,0.8);
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+#screen-timer {
+  color: rgba(136,102,255,0.5);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+#screen-status {
+  color: #44ff88;
+  font-size: 10px;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+#screen-content {
+  padding: 8px 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.s-line {
+  line-height: 1.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: fadein-line 0.3s ease;
+  font-size: 11px;
+}
+@keyframes fadein-line {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.s-think { color: #9966ff; }
+.s-tool  { color: #44aaff; }
+.s-args  { color: rgba(180,200,255,0.5); }
+.s-result{ color: #44ff88; }
+.s-error { color: #ff4466; }
+.s-type  { color: #ccbbff; }
+.s-speak { color: #ffaadd; }
+.s-idle  { color: rgba(136,102,255,0.4); font-style: italic; }
+
+/* ── Terminal (bottom right, PERMANENT) ─────────────── */
+#terminal {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  width: 380px;
+  height: 280px;
+  background: rgba(8,4,20,0.92);
+  border: 1px solid rgba(0,204,255,0.25);
+  border-radius: 8px;
+  box-shadow: 0 0 24px rgba(0,204,255,0.1), 0 0 48px rgba(0,204,255,0.04);
+  font-size: 11px;
+  color: #88ffcc;
+  z-index: 20;
+  pointer-events: none;
+  opacity: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  backdrop-filter: blur(4px);
+}
+
+#terminal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(0,204,255,0.15);
+  color: rgba(0,204,255,0.6);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+#terminal-title {
+  flex: 1;
+  letter-spacing: 0.1em;
+}
+#terminal-uptime {
+  color: rgba(0,204,255,0.4);
+  font-variant-numeric: tabular-nums;
+}
+
+#terminal-content {
+  padding: 8px 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  scrollbar-width: none;
+}
+#terminal-content::-webkit-scrollbar { display: none; }
+
+/* ── Subtitles (bottom center) ──────────────────────── */
+#subtitles {
+  position: fixed;
+  bottom: 310px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 18px;
+  color: #e0d0ff;
+  background: rgba(20,10,30,0.88);
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: 1px solid rgba(136,102,255,0.3);
+  box-shadow: 0 4px 20px rgba(136,102,255,0.2);
+  text-align: center;
+  max-width: 55%;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  text-shadow: 0 0 10px rgba(136,102,255,0.5);
+}
+#subtitles:not(:empty) { opacity: 1; }
+
+/* ── Wallet ─────────────────────────────────────────── */
+#wallet {
+  position: fixed;
+  top: 20px;
+  right: 400px;
+  color: #00ccff;
+  font-size: 13px;
+  z-index: 50;
+}

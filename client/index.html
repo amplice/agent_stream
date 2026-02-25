@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nox Virtual Streamer</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="scene-overlay"></div>
+
+  <div id="live-badge">
+    <div id="live-dot"></div>
+    <span id="live-text">LIVE</span>
+  </div>
+
+  <div id="state-indicator">
+    <div id="state-dot"></div>
+    <span id="state-label">idle</span>
+  </div>
+
+  <div id="subtitles"></div>
+  <div id="wallet"></div>
+
+  <script type="module" src="./js/main.ts"></script>
+</body>
+</html>
