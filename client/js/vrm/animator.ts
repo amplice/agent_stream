@@ -24,12 +24,12 @@ export class AvatarAnimator {
   private headTargetZ = 0;
   private spineTargetX = 0;
   private chestTargetX = 0;
-  // Calibrated from actual bone-default dump (Feb 25)
-  // Rest: lUpper z=-0.860 rUpper z=0.889, lLower x=-0.428 rLower x=-0.766
-  private lUpperTargetX = -0.15; private lUpperTargetZ = -1.4;
-  private rUpperTargetX = -0.18; private rUpperTargetZ = 1.4;
-  private lLowerTargetX = -0.5;
-  private rLowerTargetX = -0.5;
+  // Testing axis direction — rest was lZ=-0.860 rZ=+0.889
+  // -1.4 = arms UP. Try opposite direction.
+  private lUpperTargetX = 0; private lUpperTargetZ = 0.5;
+  private rUpperTargetX = 0; private rUpperTargetZ = -0.5;
+  private lLowerTargetX = 0;
+  private rLowerTargetX = 0;
 
   // Phases
   private swayPhase = Math.random() * Math.PI * 2;
@@ -135,18 +135,18 @@ export class AvatarAnimator {
 
     switch (this.state) {
       case 'idle': {
-        // Arms relaxed at sides with subtle sway
+        // TEST: opposite Z direction — lZ=+0.5, rZ=-0.5
         this.headTargetX = Math.sin(s * 0.7) * 0.04;
         this.headTargetY = Math.sin(s * 0.3) * 0.08;
         this.headTargetZ = Math.sin(s * 0.4) * 0.02;
         this.spineTargetX = Math.sin(s * 0.6) * 0.02;
         this.chestTargetX = Math.sin(s * 0.5) * 0.03;
-        this.lUpperTargetX = -0.15 + Math.sin(s * 0.4) * 0.03;
-        this.lUpperTargetZ = -1.4 + Math.sin(s * 0.3) * 0.04;
-        this.rUpperTargetX = -0.18 + Math.sin(s * 0.4 + 0.5) * 0.03;
-        this.rUpperTargetZ = 1.4 + Math.sin(s * 0.3) * 0.04;
-        this.lLowerTargetX = -0.5;
-        this.rLowerTargetX = -0.5;
+        this.lUpperTargetX = 0;
+        this.lUpperTargetZ = 0.5;
+        this.rUpperTargetX = 0;
+        this.rUpperTargetZ = -0.5;
+        this.lLowerTargetX = 0;
+        this.rLowerTargetX = 0;
         break;
       }
       case 'thinking': {

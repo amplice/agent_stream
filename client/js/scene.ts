@@ -41,7 +41,7 @@ function initLighting(): void {
 }
 
 function initCamera(): void {
-  // VRM faces -Z, so camera goes in -Z to look at the front
+  // VRM 0.0 faces -Z, camera at -Z looking toward origin = looking at face
   camera.position.set(0, 1.35, -1.8);
   camera.lookAt(0, 1.3, 0);
 }
