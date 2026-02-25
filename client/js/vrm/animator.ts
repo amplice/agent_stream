@@ -48,8 +48,30 @@ export class AvatarAnimator {
 
   constructor(vrm: VRM) {
     this.vrm = vrm;
-    console.log('[animator] BUILD: v8 — quaternion arms, no more euler guessing');
+    console.log('[animator] BUILD: v9 — setNormalizedPose, keyboard axis test');
+    console.log('[animator] Keys: 1-6 = test arm axes (+X,-X,+Y,-Y,+Z,-Z), [/] = adjust angle');
     console.log('[animator] Procedural animator ready');
+
+    // Test mode: cycle through axes
+    this.testAxis = new THREE.Vector3(0, 1, 0); // default Y
+    this.testAngle = 1.57;
+    window.addEventListener('keydown', (e) => {
+      const axes: [string, THREE.Vector3][] = [
+        ['+X', new THREE.Vector3(1,0,0)],
+        ['-X', new THREE.Vector3(-1,0,0)],
+        ['+Y', new THREE.Vector3(0,1,0)],
+        ['-Y', new THREE.Vector3(0,-1,0)],
+        ['+Z', new THREE.Vector3(0,0,1)],
+        ['-Z', new THREE.Vector3(0,0,-1)],
+      ];
+      if (e.key >= '1' && e.key <= '6') {
+        const idx = parseInt(e.key) - 1;
+        this.testAxis = axes[idx][1];
+        console.log(`[test] axis=${axes[idx][0]} angle=${this.testAngle.toFixed(2)}`);
+      }
+      if (e.key === '[') { this.testAngle -= 0.2; console.log(`[test] angle=${this.testAngle.toFixed(2)}`); }
+      if (e.key === ']') { this.testAngle += 0.2; console.log(`[test] angle=${this.testAngle.toFixed(2)}`); }
+    });
 
     // Debug: [ = arms more down, ] = arms more up
     window.addEventListener('keydown', (e) => {
@@ -101,6 +123,8 @@ export class AvatarAnimator {
   }
 
   private debugLogTimer = 0;
+  private testAxis = new THREE.Vector3(0, 1, 0);
+  private testAngle = 1.57;
 
   update(dt: number): void {
     this.time += dt;
@@ -207,62 +231,61 @@ export class AvatarAnimator {
     }
   }
 
+  // Quaternion for target arm pose — cached for slerp
+  private luCurrent = new THREE.Quaternion();
+  private ruCurrent = new THREE.Quaternion();
+
   private applyBones(): void {
-    const b = (name: string) => {
-      return this.vrm.humanoid?.getNormalizedBoneNode(name as any) ?? null;
-    };
+    // Use setNormalizedPose for head/spine/chest
+    const hx = this.headTargetX + this.reactionHeadOffset.x;
+    const hy = this.headTargetY + this.reactionHeadOffset.y;
+    const hz = this.headTargetZ + this.reactionHeadOffset.z;
 
-    const speed = 0.08;
+    _q.setFromEuler(new THREE.Euler(hx, hy, hz));
+    const headQ: [number, number, number, number] = [_q.x, _q.y, _q.z, _q.w];
 
-    // Head — simple euler is fine for small rotations
-    const head = b('head');
-    if (head) {
-      head.quaternion.slerp(
-        _q.setFromEuler(new THREE.Euler(
-          this.headTargetX + this.reactionHeadOffset.x,
-          this.headTargetY + this.reactionHeadOffset.y,
-          this.headTargetZ + this.reactionHeadOffset.z
-        )),
-        speed
-      );
-    }
+    _q.setFromEuler(new THREE.Euler(this.spineTargetX, 0, 0));
+    const spineQ: [number, number, number, number] = [_q.x, _q.y, _q.z, _q.w];
 
-    const spine = b('spine');
-    if (spine) {
-      spine.quaternion.slerp(_q.setFromEuler(new THREE.Euler(this.spineTargetX, 0, 0)), speed * 0.5);
-    }
+    _q.setFromEuler(new THREE.Euler(this.chestTargetX, 0, 0));
+    const chestQ: [number, number, number, number] = [_q.x, _q.y, _q.z, _q.w];
 
-    const chest = b('chest');
-    if (chest) {
-      chest.quaternion.slerp(_q.setFromEuler(new THREE.Euler(this.chestTargetX, 0, 0)), speed * 0.5);
-    }
+    // Arms: Z = roll/twist, so use WORLD-SPACE rotation for arm swing
+    // VRM normalized leftUpperArm in T-pose: bone axis = -X (toward left hand)
+    // To swing arm DOWN from T-pose: rotate around +Z world axis
+    // But normalized bone local Z IS the bone axis (twist). 
+    // The CORRECT way: set the arm target as a world-space rotation.
+    // For arms down: leftUpperArm needs its local Y pointing down.
+    // In T-pose, local Y points forward (+Z world? or +Y world?)
+    // Let's just try using setNormalizedPose with known good quaternions.
+    
+    // Arms down from T-pose = rotate 90° around the bone-local X axis 
+    // (X = perpendicular to arm in the "swing forward/back" plane)
+    // But this moved arms forward in our test. So the "down" direction 
+    // might be -Y local. Let's use setNormalizedPose and try all axes.
+    
+    // Use testAxis/testAngle for interactive debugging
+    const luTarget = new THREE.Quaternion().setFromAxisAngle(this.testAxis, this.testAngle);
+    const ruTarget = new THREE.Quaternion().setFromAxisAngle(this.testAxis, -this.testAngle);
+    
+    this.luCurrent.slerp(luTarget, 0.15);
+    this.ruCurrent.slerp(ruTarget, 0.15);
 
-    // Arms — use quaternion multiply: first rotate Z (down from T-pose), then X (forward/back)
-    const lu = b('leftUpperArm');
-    if (lu) {
-      const target = new THREE.Quaternion()
-        .setFromAxisAngle(_axis.set(0, 0, 1), this.lUpperTargetZ)
-        .multiply(_q.setFromAxisAngle(_axis.set(1, 0, 0), this.lUpperTargetX));
-      lu.quaternion.slerp(target, speed);
-    }
+    _q.setFromAxisAngle(_axis.set(1, 0, 0), this.lLowerTargetX);
+    const llQ: [number, number, number, number] = [_q.x, _q.y, _q.z, _q.w];
 
-    const ru = b('rightUpperArm');
-    if (ru) {
-      const target = new THREE.Quaternion()
-        .setFromAxisAngle(_axis.set(0, 0, 1), this.rUpperTargetZ)
-        .multiply(_q.setFromAxisAngle(_axis.set(1, 0, 0), this.rUpperTargetX));
-      ru.quaternion.slerp(target, speed);
-    }
+    _q.setFromAxisAngle(_axis.set(1, 0, 0), this.rLowerTargetX);
+    const rlQ: [number, number, number, number] = [_q.x, _q.y, _q.z, _q.w];
 
-    const ll = b('leftLowerArm');
-    if (ll) {
-      ll.quaternion.slerp(_q.setFromAxisAngle(_axis.set(1, 0, 0), this.lLowerTargetX), speed);
-    }
-
-    const rl = b('rightLowerArm');
-    if (rl) {
-      rl.quaternion.slerp(_q.setFromAxisAngle(_axis.set(1, 0, 0), this.rLowerTargetX), speed);
-    }
+    this.vrm.humanoid.setNormalizedPose({
+      head: { rotation: headQ },
+      spine: { rotation: spineQ },
+      chest: { rotation: chestQ },
+      leftUpperArm: { rotation: [this.luCurrent.x, this.luCurrent.y, this.luCurrent.z, this.luCurrent.w] },
+      rightUpperArm: { rotation: [this.ruCurrent.x, this.ruCurrent.y, this.ruCurrent.z, this.ruCurrent.w] },
+      leftLowerArm: { rotation: llQ },
+      rightLowerArm: { rotation: rlQ },
+    });
   }
 
   private updateBlink(dt: number) {
