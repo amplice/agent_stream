@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import type { VRM } from '@pixiv/three-vrm';
 
+const _q = new THREE.Quaternion();
+const _axis = new THREE.Vector3();
+
 function safe(vrm: VRM, name: string, value: number) {
   try { vrm.expressionManager?.setValue(name, value); } catch {}
 }
@@ -45,7 +48,7 @@ export class AvatarAnimator {
 
   constructor(vrm: VRM) {
     this.vrm = vrm;
-    console.log('[animator] BUILD: v7 — lZ=+1.57 rZ=-1.57 (arms down)');
+    console.log('[animator] BUILD: v8 — quaternion arms, no more euler guessing');
     console.log('[animator] Procedural animator ready');
 
     // Debug: [ = arms more down, ] = arms more up
@@ -206,47 +209,59 @@ export class AvatarAnimator {
 
   private applyBones(): void {
     const b = (name: string) => {
-      const node = this.vrm.humanoid?.getNormalizedBoneNode(name as any);
-      return node ?? null;
+      return this.vrm.humanoid?.getNormalizedBoneNode(name as any) ?? null;
     };
-
-    const lerp = (current: number, target: number, alpha: number) =>
-      current + (target - current) * alpha;
 
     const speed = 0.08;
 
+    // Head — simple euler is fine for small rotations
     const head = b('head');
     if (head) {
-      head.rotation.x = lerp(head.rotation.x, this.headTargetX + this.reactionHeadOffset.x, speed);
-      head.rotation.y = lerp(head.rotation.y, this.headTargetY + this.reactionHeadOffset.y, speed);
-      head.rotation.z = lerp(head.rotation.z, this.headTargetZ + this.reactionHeadOffset.z, speed);
+      head.quaternion.slerp(
+        _q.setFromEuler(new THREE.Euler(
+          this.headTargetX + this.reactionHeadOffset.x,
+          this.headTargetY + this.reactionHeadOffset.y,
+          this.headTargetZ + this.reactionHeadOffset.z
+        )),
+        speed
+      );
     }
 
     const spine = b('spine');
-    if (spine) spine.rotation.x = lerp(spine.rotation.x, this.spineTargetX, speed * 0.5);
+    if (spine) {
+      spine.quaternion.slerp(_q.setFromEuler(new THREE.Euler(this.spineTargetX, 0, 0)), speed * 0.5);
+    }
 
     const chest = b('chest');
-    if (chest) chest.rotation.x = lerp(chest.rotation.x, this.chestTargetX, speed * 0.5);
+    if (chest) {
+      chest.quaternion.slerp(_q.setFromEuler(new THREE.Euler(this.chestTargetX, 0, 0)), speed * 0.5);
+    }
 
+    // Arms — use quaternion multiply: first rotate Z (down from T-pose), then X (forward/back)
     const lu = b('leftUpperArm');
     if (lu) {
-      lu.rotation.x = lerp(lu.rotation.x, this.lUpperTargetX, speed);
-      lu.rotation.z = lerp(lu.rotation.z, this.lUpperTargetZ, speed);
+      const target = new THREE.Quaternion()
+        .setFromAxisAngle(_axis.set(0, 0, 1), this.lUpperTargetZ)
+        .multiply(_q.setFromAxisAngle(_axis.set(1, 0, 0), this.lUpperTargetX));
+      lu.quaternion.slerp(target, speed);
     }
+
     const ru = b('rightUpperArm');
     if (ru) {
-      ru.rotation.x = lerp(ru.rotation.x, this.rUpperTargetX, speed);
-      ru.rotation.z = lerp(ru.rotation.z, this.rUpperTargetZ, speed);
+      const target = new THREE.Quaternion()
+        .setFromAxisAngle(_axis.set(0, 0, 1), this.rUpperTargetZ)
+        .multiply(_q.setFromAxisAngle(_axis.set(1, 0, 0), this.rUpperTargetX));
+      ru.quaternion.slerp(target, speed);
     }
-    const ll = b('leftLowerArm');
-    if (ll) ll.rotation.x = lerp(ll.rotation.x, this.lLowerTargetX, speed);
-    const rl = b('rightLowerArm');
-    if (rl) rl.rotation.x = lerp(rl.rotation.x, this.rLowerTargetX, speed);
 
-    // Debug: log actual bone values every 3s
-    this.debugLogTimer += 1;
-    if (this.debugLogTimer % 180 === 0 && lu && ru) {
-      console.log(`[bones-live] LU: x=${lu.rotation.x.toFixed(2)} z=${lu.rotation.z.toFixed(2)} (target z=${this.lUpperTargetZ.toFixed(2)}) | RU: x=${ru.rotation.x.toFixed(2)} z=${ru.rotation.z.toFixed(2)} (target z=${this.rUpperTargetZ.toFixed(2)})`);
+    const ll = b('leftLowerArm');
+    if (ll) {
+      ll.quaternion.slerp(_q.setFromAxisAngle(_axis.set(1, 0, 0), this.lLowerTargetX), speed);
+    }
+
+    const rl = b('rightLowerArm');
+    if (rl) {
+      rl.quaternion.slerp(_q.setFromAxisAngle(_axis.set(1, 0, 0), this.rLowerTargetX), speed);
     }
   }
 
