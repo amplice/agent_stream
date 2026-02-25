@@ -109,6 +109,8 @@ export class AvatarAnimator {
     }
   }
 
+  private debugLogTimer = 0;
+
   update(dt: number): void {
     this.time += dt;
     this.swayPhase += dt * 0.5;
@@ -253,6 +255,12 @@ export class AvatarAnimator {
     if (ll) ll.rotation.x = lerp(ll.rotation.x, this.lLowerTargetX, speed);
     const rl = b('rightLowerArm');
     if (rl) rl.rotation.x = lerp(rl.rotation.x, this.rLowerTargetX, speed);
+
+    // Debug: log actual bone values every 3s
+    this.debugLogTimer += 1;
+    if (this.debugLogTimer % 180 === 0 && lu && ru) {
+      console.log(`[bones-live] LU: x=${lu.rotation.x.toFixed(2)} z=${lu.rotation.z.toFixed(2)} (target z=${this.lUpperTargetZ.toFixed(2)}) | RU: x=${ru.rotation.x.toFixed(2)} z=${ru.rotation.z.toFixed(2)} (target z=${this.rUpperTargetZ.toFixed(2)})`);
+    }
   }
 
   private updateBlink(dt: number) {
