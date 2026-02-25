@@ -9,6 +9,9 @@ import { LipSync } from './lipSync';
 import { Terminal } from './terminal';
 import { Screen } from './screen';
 import { initStats, incrementMsgCount, setTask } from './stats';
+import { ProjectContext } from './projectContext';
+import { BuildStatus } from './buildStatus';
+import { Chat } from './chat';
 import type { VRM } from '@pixiv/three-vrm';
 
 let particleSystem: ParticleSystem;
@@ -100,10 +103,19 @@ async function bootstrap(): Promise<void> {
   // Init stats (wallet balance etc)
   initStats();
 
+  // New widgets
+  const projectContext = new ProjectContext();
+  const buildStatus = new BuildStatus();
+  const chat = new Chat(ws);
+
+  // Track idle time for impatient reaction
+  let lastActivityTime = performance.now();
+
   ws.on('thinking', (payload: any) => {
     particleSystem.setMode('thinking');
-    if (animator) animator.transition('thinking');
+    if (animator) { animator.transition('thinking'); animator.react('focused'); }
     setStateUI('thinking');
+    lastActivityTime = performance.now();
     if (payload?.text) { terminal.thinking(payload.text); screen.thinking(payload.text); }
   });
 
@@ -141,21 +153,47 @@ async function bootstrap(): Promise<void> {
   ws.on('executing', (payload: any) => {
     if (animator) animator.transition('executing');
     setStateUI('executing');
+    lastActivityTime = performance.now();
     if (payload?.command) {
       const label = payload.input ? `${payload.command} ${payload.input}` : payload.command;
       terminal.command(label);
       screen.tool(payload.command);
+      // Build detection
+      if (payload.command === 'exec' && payload.input && /bun run|npm run|cargo build|make /.test(payload.input)) {
+        buildStatus.startBuild(payload.command, payload.input);
+      }
     }
     if (payload?.output) terminal.output(payload.output);
   });
 
   ws.on('tool_result', (payload: any) => {
+    lastActivityTime = performance.now();
     if (payload?.output) { terminal.output(payload.output, '#44ffaa'); screen.result(payload.output); }
     if (payload?.error) { terminal.output(payload.error, '#ff4466'); screen.result(payload.error, true); }
+
+    // Reaction based on result
+    if (animator) {
+      const output = (payload?.output || '') + (payload?.error || '');
+      const isError = payload?.exitCode !== undefined && payload.exitCode !== 0
+        || /error|Error|failed|FAILED/.test(output);
+      animator.react(isError ? 'error' : 'success');
+    }
+
+    // Build status
+    if (buildStatus.isBuilding) {
+      const output = payload?.output || payload?.error || '';
+      const success = !payload?.error && (payload?.exitCode === undefined || payload?.exitCode === 0);
+      buildStatus.endBuild(success, output);
+    }
   });
 
   ws.on('task', (payload: any) => {
     if (payload?.text) setTask(payload.text);
+  });
+
+  // Project context
+  ws.on('project', (payload: any) => {
+    projectContext.update(payload || {});
   });
 
   // Narration — only fires when idle or transitioning
@@ -178,7 +216,11 @@ async function bootstrap(): Promise<void> {
         }
       } catch {}
     } else {
-      // No audio — show subtitle for 3s then return to idle
+      // No audio — check for impatient reaction
+      if (animator && (performance.now() - lastActivityTime) > 15000) {
+        animator.react('impatient');
+      }
+      // Show subtitle for 3s then return to idle
       setTimeout(() => {
         subtitleRenderer.clear();
         if (animator) animator.transition('idle');

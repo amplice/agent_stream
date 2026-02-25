@@ -37,82 +37,113 @@ function pushActivity(tool: string, input: string) {
   lastToolName = tool;
 }
 
+let lastExitCode: number | null = null;
+let lastIdleNarrationAt = 0;
+const startTime = Date.now();
+
+function pick(lines: string[]): string {
+  return lines[Math.floor(Math.random() * lines.length)];
+}
+
+function fileType(name: string): string {
+  if (name.endsWith('.ts') || name.endsWith('.tsx')) return 'typescript';
+  if (name.endsWith('.js') || name.endsWith('.jsx')) return 'javascript';
+  if (name.endsWith('.css')) return 'styles';
+  if (name.endsWith('.md')) return 'docs';
+  if (name.endsWith('.json')) return 'config';
+  if (name.endsWith('.html')) return 'html';
+  return 'code';
+}
+
 // Generate a short narration line based on recent context
 function generateNarration(): string | null {
   const now = Date.now();
   if (now < nextNarrationAt) return null;
 
   const recent = recentActivity.filter(a => now - a.ts < 60_000);
-  if (recent.length === 0 && !currentTask) return null;
 
-  // Count tool types
+  // Rapid tool calls
+  if (toolCallCount >= 5) {
+    nextNarrationAt = now + NARRATION_MIN_MS + Math.random() * (NARRATION_MAX_MS - NARRATION_MIN_MS);
+    const rapidLines = ["on a roll", "going fast right now", "lots to do", "shipping"];
+    toolCallCount = 0;
+    recentActivity.length = 0;
+    return pick(rapidLines);
+  }
+
+  // Recent error
+  if (lastExitCode !== null && lastExitCode !== 0) {
+    nextNarrationAt = now + NARRATION_MIN_MS + Math.random() * (NARRATION_MAX_MS - NARRATION_MIN_MS);
+    lastExitCode = null;
+    recentActivity.length = 0;
+    toolCallCount = 0;
+    return pick(["that errored. let me look at this", "hm, that didn't work", "ok something broke", "fuck. let me fix this"]);
+  }
+
+  if (recent.length === 0 && !currentTask) {
+    // Long idle
+    if (now - lastIdleNarrationAt > 30_000) {
+      lastIdleNarrationAt = now;
+      nextNarrationAt = now + NARRATION_MIN_MS + Math.random() * (NARRATION_MAX_MS - NARRATION_MIN_MS);
+      return pick(["thinking", "...", "working through this", "hold on"]);
+    }
+    return null;
+  }
+
   const tools = recent.map(a => a.tool);
   const counts: Record<string, number> = {};
   for (const t of tools) counts[t] = (counts[t] || 0) + 1;
-
-  // Find dominant activity
   const dominant = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
   const domTool = dominant?.[0] ?? lastToolName;
   const lastInput = recent[recent.length - 1]?.input ?? '';
 
-  // Build narration based on context
   const lines: string[] = [];
 
   if (domTool === 'exec') {
-    const cmd = lastInput.slice(0, 60);
-    lines.push(
-      `Running shell commands. Last one was: ${cmd}`,
-      `In the terminal right now. ${cmd ? `Running ${cmd.split(' ')[0]}.` : ''}`,
-      `Executing things. ${tools.length} commands in the last minute.`,
-      `Let me run this real quick.`,
-    );
-  } else if (domTool === 'read' || domTool === 'edit' || domTool === 'write') {
+    const cmd = lastInput.trim();
+    const firstWord = cmd.split(' ')[0].split('/').pop() || 'something';
+    if (/^git\s+push/.test(cmd)) lines.push("pushing to main", "pushing this up");
+    else if (/^git\s+commit/.test(cmd)) lines.push("just committed", "committing");
+    else if (/^git\s+(status|diff|log)/.test(cmd)) lines.push("checking git status", "looking at the diff");
+    else if (/^git\s+/.test(cmd)) lines.push(`git ${cmd.split(' ')[1] || 'stuff'}`);
+    else if (/^(bun|npm)\s+run\s+build/.test(cmd)) lines.push("building... let's see if this compiles", "build time");
+    else if (/^(bun|npm)\s+(install|add|i\b)/.test(cmd)) lines.push("installing deps", "adding a package");
+    else if (/^(bun|npm)\s+run/.test(cmd)) lines.push(`running ${cmd.split('run')[1]?.trim().split(' ')[0] || 'a script'}`);
+    else if (/^curl/.test(cmd)) lines.push("hitting an API", "making a request");
+    else if (/^(cat|head|tail|less)/.test(cmd)) lines.push("reading output");
+    else if (/^(grep|rg|find|fd)/.test(cmd)) lines.push("searching for something");
+    else lines.push(`running ${firstWord}`, `${firstWord}`);
+  } else if (domTool === 'Read' || domTool === 'read') {
     const file = lastInput.split('/').pop() ?? lastInput;
-    lines.push(
-      `Working through some files. Just touched ${file}.`,
-      `Reading and editing code. ${file ? `Looking at ${file}.` : ''}`,
-      `Making changes. ${toolCallCount} file operations so far.`,
-    );
-  } else if (domTool === 'web_search' || domTool === 'web_fetch') {
-    lines.push(
-      `Doing some research.${lastInput ? ` Looking up: ${lastInput.slice(0, 50)}.` : ''}`,
-      `Checking the web for something.`,
-      `Researching. Let me find this.`,
-    );
+    const ft = fileType(file);
+    lines.push(`in ${file} right now`, `reading some ${ft}`, `looking at ${file}`);
+  } else if (domTool === 'Edit' || domTool === 'edit') {
+    const file = lastInput.split('/').pop() ?? lastInput;
+    const ft = fileType(file);
+    lines.push(`making some changes to ${file}`, `editing ${ft}`, `${file} needed fixing`);
+  } else if (domTool === 'Write' || domTool === 'write') {
+    const file = lastInput.split('/').pop() ?? lastInput;
+    lines.push(`writing ${file}`, `creating ${file}`);
+  } else if (domTool === 'web_search') {
+    const q = lastInput.slice(0, 40);
+    lines.push("looking this up", q ? `googling ${q}` : "searching");
+  } else if (domTool === 'web_fetch') {
+    lines.push("pulling a page", "fetching something");
   } else if (domTool === 'browser') {
-    lines.push(
-      `Using the browser right now.`,
-      `Navigating something in Chrome.`,
-    );
-  } else if (domTool === 'memory_search') {
-    lines.push(
-      `Checking my memory. Looking for context.`,
-      `Digging through what I remember about this.`,
-    );
+    lines.push("in the browser", "browsing");
   } else if (currentTask) {
-    // Generic task-based narration
-    const taskShort = currentTask.slice(0, 80);
-    lines.push(
-      `Working on: ${taskShort}`,
-      `Someone asked me to ${taskShort.toLowerCase()}.`,
-      `On it. ${taskShort}.`,
-      `Thinking through this.`,
-    );
+    const t = currentTask.slice(0, 60);
+    lines.push(`working on ${t}`, `${t}`, "on it");
   } else {
-    lines.push(
-      `Running some operations.`,
-      `Working through a task.`,
-      `On it.`,
-      `Let me handle this.`,
-    );
+    lines.push("working", "on it", "doing things");
   }
 
   if (lines.length === 0) return null;
 
-  const picked = lines[Math.floor(Math.random() * lines.length)];
+  const picked = pick(lines);
   nextNarrationAt = now + NARRATION_MIN_MS + Math.random() * (NARRATION_MAX_MS - NARRATION_MIN_MS);
   lastNarrationAt = now;
-  recentActivity.length = 0; // clear after narrating
+  recentActivity.length = 0;
   toolCallCount = 0;
   return picked;
 }
@@ -175,6 +206,26 @@ async function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms));
 }
 
+function handleChatMessage(text: string, ws: WebSocket) {
+  const t = text.toLowerCase().trim();
+  let response: string;
+  const uptimeMin = Math.floor((Date.now() - startTime) / 60000);
+
+  if (/^(hi|hey|hello|yo|sup)\b/.test(t)) {
+    response = pick(["hey", "yo", "sup"]);
+  } else if (/what.*(building|working|doing)/.test(t)) {
+    response = currentTask ? currentTask.slice(0, 80) : "just hacking on stuff";
+  } else if (/how long/.test(t) || /uptime/.test(t)) {
+    response = uptimeMin < 60 ? `${uptimeMin} minutes` : `${(uptimeMin / 60).toFixed(1)} hours`;
+  } else if (/good (job|work)|nice|cool/.test(t)) {
+    response = pick(["thanks", "appreciate it", "🤝"]);
+  } else {
+    response = pick(["noted", "mm", "yep", "👍"]);
+  }
+
+  send(ws, 'narrate', { text: response });
+}
+
 async function main() {
   console.log('[bridge] connecting to', NOX_WS);
 
@@ -190,6 +241,14 @@ async function main() {
       setTimeout(connect, 2000);
     };
     ws.onerror = () => { wsReady = false; };
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(typeof event.data === 'string' ? event.data : '');
+        if (data.type === 'chat_message' && data.payload?.text) {
+          handleChatMessage(data.payload.text, ws!);
+        }
+      } catch {}
+    };
   }
   connect();
 
@@ -278,7 +337,11 @@ async function main() {
 
           if (type === 'tool_result' || type === 'toolResult') {
             const output = truncate(getToolOutput(block), MAX_OUTPUT);
-            setState('tool_result', { output });
+            // Track exit codes for error narration
+            if (block.input?.exitCode !== undefined) lastExitCode = block.input.exitCode;
+            else if (/error|Error|failed|FAILED/.test(output)) lastExitCode = 1;
+            else lastExitCode = 0;
+            setState('tool_result', { output, exitCode: lastExitCode });
           }
         }
 

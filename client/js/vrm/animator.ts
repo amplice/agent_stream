@@ -35,6 +35,13 @@ export class AvatarAnimator {
   private fingerPhase = 0;
   private speakPhase = 0;
 
+  // Reaction overlay
+  private reactionActive = false;
+  private reactionTimer = 0;
+  private reactionDuration = 1.5;
+  private reactionExpressions: Record<string, number> = {};
+  private reactionHeadOffset = { x: 0, y: 0, z: 0 };
+
   constructor(vrm: VRM) {
     this.vrm = vrm;
     console.log('[animator] Procedural animator ready');
@@ -73,9 +80,46 @@ export class AvatarAnimator {
 
   get currentState(): StateName { return this.state; }
 
+  react(event: 'success' | 'error' | 'surprise' | 'focused' | 'impatient'): void {
+    this.reactionActive = true;
+    this.reactionTimer = 0;
+    this.reactionDuration = 1.5;
+    this.reactionHeadOffset = { x: 0, y: 0, z: 0 };
+
+    switch (event) {
+      case 'success':
+        this.reactionExpressions = { happy: 0.8 };
+        break;
+      case 'error':
+        this.reactionExpressions = { angry: 0.6, sad: 0.2 };
+        break;
+      case 'surprise':
+        this.reactionExpressions = { relaxed: 0.7 };
+        this.reactionHeadOffset = { x: 0, y: 0, z: 0.12 };
+        break;
+      case 'focused':
+        this.reactionExpressions = { angry: 0.15 };
+        break;
+      case 'impatient':
+        this.reactionExpressions = { relaxed: 0.3 };
+        this.reactionHeadOffset = { x: 0, y: 0.08, z: 0 };
+        break;
+    }
+  }
+
   update(dt: number): void {
     this.time += dt;
     this.swayPhase += dt * 0.5;
+
+    // Update reaction timer
+    if (this.reactionActive) {
+      this.reactionTimer += dt;
+      if (this.reactionTimer >= this.reactionDuration) {
+        this.reactionActive = false;
+        this.reactionExpressions = {};
+        this.reactionHeadOffset = { x: 0, y: 0, z: 0 };
+      }
+    }
 
     this.updateTargets(dt);
     this.applyBones();
@@ -181,9 +225,9 @@ export class AvatarAnimator {
 
     const head = b('head');
     if (head) {
-      head.rotation.x = lerp(head.rotation.x, this.headTargetX, speed);
-      head.rotation.y = lerp(head.rotation.y, this.headTargetY, speed);
-      head.rotation.z = lerp(head.rotation.z, this.headTargetZ, speed);
+      head.rotation.x = lerp(head.rotation.x, this.headTargetX + this.reactionHeadOffset.x, speed);
+      head.rotation.y = lerp(head.rotation.y, this.headTargetY + this.reactionHeadOffset.y, speed);
+      head.rotation.z = lerp(head.rotation.z, this.headTargetZ + this.reactionHeadOffset.z, speed);
     }
 
     const spine = b('spine');
@@ -229,30 +273,48 @@ export class AvatarAnimator {
 
   private updateExpressions() {
     const t = this.time;
+
+    // Base expressions from state
+    const base: Record<string, number> = {};
     switch (this.state) {
       case 'idle':
-        safe(this.vrm, 'relaxed', 0.15 + Math.sin(t * 0.3) * 0.05);
-        safe(this.vrm, 'happy', 0.05);
-        safe(this.vrm, 'angry', 0);
-        safe(this.vrm, 'sad', 0);
+        base.relaxed = 0.15 + Math.sin(t * 0.3) * 0.05;
+        base.happy = 0.05;
+        base.angry = 0;
+        base.sad = 0;
         break;
       case 'thinking':
-        safe(this.vrm, 'relaxed', 0.4);
-        safe(this.vrm, 'happy', 0);
-        safe(this.vrm, 'neutral', 0.1);
+        base.relaxed = 0.4;
+        base.happy = 0;
+        base.neutral = 0.1;
         break;
       case 'typing':
-        safe(this.vrm, 'happy', 0.15 + Math.sin(t * 2.5) * 0.08);
-        safe(this.vrm, 'relaxed', 0);
+        base.happy = 0.15 + Math.sin(t * 2.5) * 0.08;
+        base.relaxed = 0;
         break;
       case 'speaking':
-        safe(this.vrm, 'happy', 0.25 + Math.sin(t * 1.2) * 0.1);
-        safe(this.vrm, 'relaxed', 0);
+        base.happy = 0.25 + Math.sin(t * 1.2) * 0.1;
+        base.relaxed = 0;
         break;
       case 'executing':
-        safe(this.vrm, 'relaxed', 0.05);
-        safe(this.vrm, 'happy', 0.05);
+        base.relaxed = 0.05;
+        base.happy = 0.05;
         break;
+    }
+
+    // Blend reaction on top (fade out in last 0.3s)
+    if (this.reactionActive) {
+      const fadeStart = this.reactionDuration - 0.3;
+      const fade = this.reactionTimer > fadeStart
+        ? 1 - (this.reactionTimer - fadeStart) / 0.3
+        : 1;
+      for (const [expr, val] of Object.entries(this.reactionExpressions)) {
+        base[expr] = (base[expr] ?? 0) * (1 - fade) + val * fade;
+      }
+    }
+
+    for (const [expr, val] of Object.entries(base)) {
+      safe(this.vrm, expr, val);
     }
   }
 }

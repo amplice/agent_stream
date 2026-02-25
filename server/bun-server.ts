@@ -11,6 +11,7 @@ fs.mkdirSync(config.ttsCacheDir, { recursive: true });
 
 // Stream clients using Bun's ServerWebSocket
 const streamClients = new Set<any>();
+let openclawWs: any = null;
 
 setBroadcaster((data: unknown) => {
   const payload = JSON.stringify(data);
@@ -82,6 +83,7 @@ const server = Bun.serve<{ type: string }>({
         ws.send(JSON.stringify({ type: 'connected', ts: Date.now(), payload: {} }));
         console.log('[stream] client connected');
       } else {
+        openclawWs = ws;
         console.log('[openclaw] connected');
       }
     },
@@ -94,11 +96,40 @@ const server = Bun.serve<{ type: string }>({
         } catch (e) {
           console.error('[openclaw] bad event:', e);
         }
+      } else if (type === 'stream') {
+        // Handle chat messages from stream viewers
+        try {
+          const data = JSON.parse(message.toString());
+          if (data.type === 'chat_message' && data.payload?.text) {
+            // Broadcast to all stream clients
+            const broadcast = JSON.stringify({
+              type: 'chat_message',
+              ts: Date.now(),
+              payload: { sender: 'viewer', text: data.payload.text }
+            });
+            for (const client of streamClients) {
+              try { client.send(broadcast); } catch {}
+            }
+            // Forward to openclaw bridge connections
+            // (openclaw WS connections are not in streamClients, forward via eventRouter)
+            // We need to find openclaw ws - store it
+            if (openclawWs) {
+              try {
+                openclawWs.send(JSON.stringify({
+                  type: 'chat_message',
+                  ts: Date.now(),
+                  payload: { sender: 'viewer', text: data.payload.text }
+                }));
+              } catch {}
+            }
+          }
+        } catch {}
       }
     },
     close(ws) {
       const { type } = ws.data as any;
       streamClients.delete(ws);
+      if (type === 'openclaw') openclawWs = null;
       console.log(`[${type}] disconnected`);
     },
   }
