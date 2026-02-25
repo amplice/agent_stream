@@ -23,6 +23,28 @@
   <div id="subtitles"></div>
   <div id="wallet"></div>
 
+  <!-- Stats bar (bottom left) -->
+  <div id="stats-bar">
+    <div class="stat-chip">
+      <span class="stat-label">USDC</span>
+      <span class="stat-value green" id="stat-usdc">—</span>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">ETH</span>
+      <span class="stat-value blue" id="stat-eth">—</span>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">MSGS</span>
+      <span class="stat-value" id="stat-msgs">—</span>
+    </div>
+  </div>
+
+  <!-- Current task (bottom left, above stats) -->
+  <div id="task-banner">
+    <div class="task-label">WORKING ON</div>
+    <div class="task-text" id="task-text"></div>
+  </div>
+
   <script type="module" src="./js/main.ts"></script>
 </body>
 </html>

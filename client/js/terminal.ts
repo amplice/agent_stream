@@ -13,6 +13,7 @@ export class Terminal {
   private fillerInterval: ReturnType<typeof setInterval>;
   private startTime = Date.now();
   private lastRealLine = Date.now();
+  private lastCommandTime = 0;
 
   constructor() {
     this.el = document.createElement('div');
@@ -63,17 +64,14 @@ export class Terminal {
   }
 
   private maybeGenerateFiller() {
-    // Only generate filler if no real content in last 6s
-    if (Date.now() - this.lastRealLine < 6000) return;
+    // Only generate filler if no real content in last 8s
+    if (Date.now() - this.lastRealLine < 8000) return;
 
+    const now = new Date().toLocaleTimeString('en-GB', { hour12: false });
     const fillers = [
-      () => `<span style="color:#444">cpu ${(2 + Math.random() * 8).toFixed(1)}% | mem ${(38 + Math.random() * 25).toFixed(0)}MB | gc 0</span>`,
-      () => `<span style="color:#444">ws ▲ ${Math.floor(Math.random() * 50)}B ▼ ${Math.floor(Math.random() * 200)}B</span>`,
-      () => `<span style="color:#444">vrm bones ok | mixer ${(16 + Math.random() * 2).toFixed(1)}ms</span>`,
-      () => `<span style="color:#444">particles: ${Math.floor(40 + Math.random() * 30)} active</span>`,
-      () => `<span style="color:#444">heartbeat ✓ ${new Date().toLocaleTimeString('en-GB', { hour12: false })}</span>`,
-      () => `<span style="color:#444">event loop: ${(0.1 + Math.random() * 0.4).toFixed(2)}ms avg</span>`,
-      () => `<span style="color:#444">stream uptime ${this.uptimeEl.textContent}</span>`,
+      () => `<span style="color:#333">[${now}] waiting for input</span>`,
+      () => `<span style="color:#333">[${now}] idle — heartbeat ok</span>`,
+      () => `<span style="color:#333">[${now}] mem ${(38 + Math.random() * 25).toFixed(0)}MB | uptime ${this.uptimeEl.textContent}</span>`,
     ];
 
     const filler = fillers[Math.floor(Math.random() * fillers.length)]();
@@ -85,14 +83,17 @@ export class Terminal {
 
   command(cmd: string) {
     this.lastRealLine = Date.now();
-    this.addRaw(`<span style="color:#6688ff">❯</span> ${this.escape(cmd)}`);
+    this.lastCommandTime = Date.now();
+    const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
+    this.addRaw(`<span style="color:#444">[${time}]</span> <span style="color:#6688ff">❯</span> ${this.escape(cmd)}`);
   }
 
   output(text: string, color = '#88ffcc') {
     this.lastRealLine = Date.now();
-    for (const line of text.split('\n')) {
-      if (line.trim()) this.addRaw(`<span style="color:${color}">${this.escape(line)}</span>`);
-    }
+    const elapsed = this.lastCommandTime ? ` <span style="color:#333">${Date.now() - this.lastCommandTime}ms</span>` : '';
+    const firstLine = text.split('\n').find(l => l.trim()) ?? '';
+    if (firstLine) this.addRaw(`<span style="color:${color}">  ${this.escape(firstLine)}</span>${elapsed}`);
+    this.lastCommandTime = 0;
   }
 
   thinking(text: string) {

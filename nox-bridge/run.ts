@@ -182,7 +182,18 @@ async function main() {
 
         // User message = model is about to think
         if (msg.role === 'user') {
+          // Extract text from user message to show as current task
+          let taskText = '';
+          if (Array.isArray(content)) {
+            const textBlocks = content.filter((b: any) => b.type === 'text');
+            taskText = textBlocks.map((b: any) => b.text ?? '').join(' ').trim();
+          } else if (typeof content === 'string') {
+            taskText = content.trim();
+          }
           setState('thinking', {});
+          if (taskText && ws && wsReady) {
+            send(ws, 'task', { text: taskText });
+          }
         }
       }
 

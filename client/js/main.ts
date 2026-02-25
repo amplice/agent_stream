@@ -8,6 +8,7 @@ import { AudioPlayer } from './audioPlayer';
 import { LipSync } from './lipSync';
 import { Terminal } from './terminal';
 import { Screen } from './screen';
+import { initStats, incrementMsgCount, setTask } from './stats';
 import type { VRM } from '@pixiv/three-vrm';
 
 let particleSystem: ParticleSystem;
@@ -16,6 +17,15 @@ let animator: AvatarAnimator | null = null;
 let audioPlayer: AudioPlayer;
 let lipSync: LipSync | null = null;
 let lastTime = performance.now();
+
+// Mouse parallax
+let mouseX = 0, mouseY = 0;
+let targetCamX = 0, targetCamY = 0;
+const BASE_CAM_Z = -1.8;
+document.addEventListener('mousemove', (e) => {
+  mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
+  mouseY = -(e.clientY / window.innerHeight - 0.5) * 2;
+});
 
 function createSubtitleContainer(): HTMLElement {
   let el = document.getElementById('subtitles');
@@ -38,6 +48,13 @@ function animate(): void {
   const now = performance.now();
   const dt = (now - lastTime) / 1000;
   lastTime = now;
+
+  // Mouse parallax — camera drifts slightly toward mouse
+  targetCamX += (mouseX * 0.12 - targetCamX) * 0.04;
+  targetCamY += (mouseY * 0.08 - targetCamY) * 0.04;
+  camera.position.x = targetCamX;
+  camera.position.y = 1.35 + targetCamY;
+  camera.lookAt(0, 1.3, 0);
 
   // Update avatar state machine (bones + expressions)
   if (animator) animator.update(dt);
@@ -80,6 +97,9 @@ async function bootstrap(): Promise<void> {
   // Connect WebSocket
   const ws = new WSClient();
 
+  // Init stats (wallet balance etc)
+  initStats();
+
   ws.on('thinking', (payload: any) => {
     particleSystem.setMode('thinking');
     if (animator) animator.transition('thinking');
@@ -97,6 +117,7 @@ async function bootstrap(): Promise<void> {
   ws.on('speaking', async (payload: any) => {
     if (animator) animator.transition('speaking');
     if (payload?.text) { subtitleRenderer.showSpeaking(payload.text); screen.speaking(payload.text); }
+    incrementMsgCount();
     setStateUI('speaking');
 
     // Play TTS audio if available
@@ -131,6 +152,10 @@ async function bootstrap(): Promise<void> {
   ws.on('tool_result', (payload: any) => {
     if (payload?.output) { terminal.output(payload.output, '#44ffaa'); screen.result(payload.output); }
     if (payload?.error) { terminal.output(payload.error, '#ff4466'); screen.result(payload.error, true); }
+  });
+
+  ws.on('task', (payload: any) => {
+    if (payload?.text) setTask(payload.text);
   });
 
   ws.on('idle', () => {
