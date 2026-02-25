@@ -24,10 +24,12 @@ export class AvatarAnimator {
   private headTargetZ = 0;
   private spineTargetX = 0;
   private chestTargetX = 0;
-  private lUpperTargetX = 0; private lUpperTargetZ = -1.4;
-  private rUpperTargetX = 0; private rUpperTargetZ = 1.4;
-  private lLowerTargetX = 0.3;
-  private rLowerTargetX = 0.3;
+  // Calibrated from actual bone-default dump (Feb 25)
+  // Rest: lUpper z=-0.860 rUpper z=0.889, lLower x=-0.428 rLower x=-0.766
+  private lUpperTargetX = -0.15; private lUpperTargetZ = -1.4;
+  private rUpperTargetX = -0.18; private rUpperTargetZ = 1.4;
+  private lLowerTargetX = -0.5;
+  private rLowerTargetX = -0.5;
 
   // Phases
   private swayPhase = Math.random() * Math.PI * 2;
@@ -133,78 +135,78 @@ export class AvatarAnimator {
 
     switch (this.state) {
       case 'idle': {
-        // Arms hanging at sides — VRoid: Z rotates arm down from T-pose
+        // Arms relaxed at sides with subtle sway
         this.headTargetX = Math.sin(s * 0.7) * 0.04;
         this.headTargetY = Math.sin(s * 0.3) * 0.08;
         this.headTargetZ = Math.sin(s * 0.4) * 0.02;
         this.spineTargetX = Math.sin(s * 0.6) * 0.02;
         this.chestTargetX = Math.sin(s * 0.5) * 0.03;
-        this.lUpperTargetX = 0 + Math.sin(s * 0.4) * 0.03;
-        this.lUpperTargetZ = -1.4 + Math.sin(s * 0.3) * 0.05;
-        this.rUpperTargetX = 0 + Math.sin(s * 0.4 + 0.5) * 0.03;
-        this.rUpperTargetZ = 1.4 + Math.sin(s * 0.3) * 0.05;
-        this.lLowerTargetX = 0.3;
-        this.rLowerTargetX = 0.3;
+        this.lUpperTargetX = -0.15 + Math.sin(s * 0.4) * 0.03;
+        this.lUpperTargetZ = -1.4 + Math.sin(s * 0.3) * 0.04;
+        this.rUpperTargetX = -0.18 + Math.sin(s * 0.4 + 0.5) * 0.03;
+        this.rUpperTargetZ = 1.4 + Math.sin(s * 0.3) * 0.04;
+        this.lLowerTargetX = -0.5;
+        this.rLowerTargetX = -0.5;
         break;
       }
       case 'thinking': {
-        // Right arm raised to chin, left arm at side
-        this.headTargetX = 0.06;
-        this.headTargetY = Math.sin(s * 0.25) * 0.15;
-        this.headTargetZ = 0.08;
+        // Right hand to chin, left arm relaxed
+        this.headTargetX = 0.08;
+        this.headTargetY = Math.sin(s * 0.25) * 0.12;
+        this.headTargetZ = 0.06;
         this.spineTargetX = 0.04;
         this.chestTargetX = 0.02;
-        this.lUpperTargetX = 0;
-        this.lUpperTargetZ = -1.2;
-        this.rUpperTargetX = -0.8;  // raise right arm up
-        this.rUpperTargetZ = 0.6;
-        this.lLowerTargetX = 0.3;
-        this.rLowerTargetX = -1.0;  // bend elbow toward chin
+        this.lUpperTargetX = -0.15;
+        this.lUpperTargetZ = -1.3;
+        this.rUpperTargetX = -0.6;
+        this.rUpperTargetZ = 0.5;
+        this.lLowerTargetX = -0.5;
+        this.rLowerTargetX = -1.4;
         break;
       }
       case 'typing': {
         this.typingPhase += dt * 14;
         this.fingerPhase += dt * 18;
-        this.headTargetX = 0.07 + Math.sin(this.typingPhase * 0.5) * 0.03;
-        this.headTargetY = Math.sin(t * 0.5) * 0.05;
+        this.headTargetX = 0.1 + Math.sin(this.typingPhase * 0.5) * 0.02;
+        this.headTargetY = Math.sin(t * 0.5) * 0.04;
         this.headTargetZ = 0;
         this.spineTargetX = 0.06;
         this.chestTargetX = 0.04;
-        // Arms angled forward/down for keyboard
-        this.lUpperTargetX = -0.5 + Math.sin(this.typingPhase) * 0.06;
-        this.lUpperTargetZ = -0.7;
-        this.rUpperTargetX = -0.5 + Math.sin(this.typingPhase + Math.PI) * 0.06;
-        this.rUpperTargetZ = 0.7;
-        this.lLowerTargetX = -1.0 + Math.sin(this.typingPhase) * 0.08;
-        this.rLowerTargetX = -1.0 + Math.sin(this.typingPhase + Math.PI) * 0.08;
+        // Arms forward for keyboard
+        this.lUpperTargetX = -0.4 + Math.sin(this.typingPhase) * 0.05;
+        this.lUpperTargetZ = -0.9;
+        this.rUpperTargetX = -0.4 + Math.sin(this.typingPhase + Math.PI) * 0.05;
+        this.rUpperTargetZ = 0.9;
+        this.lLowerTargetX = -1.2 + Math.sin(this.typingPhase) * 0.06;
+        this.rLowerTargetX = -1.2 + Math.sin(this.typingPhase + Math.PI) * 0.06;
         break;
       }
       case 'speaking': {
         this.speakPhase += dt * 2.2;
-        this.headTargetX = Math.sin(this.speakPhase * 0.6) * 0.1;
-        this.headTargetY = Math.sin(this.speakPhase * 0.4) * 0.15;
-        this.headTargetZ = Math.sin(this.speakPhase * 0.3) * 0.05;
-        this.spineTargetX = Math.sin(this.speakPhase * 0.5) * 0.04;
+        this.headTargetX = Math.sin(this.speakPhase * 0.6) * 0.08;
+        this.headTargetY = Math.sin(this.speakPhase * 0.4) * 0.12;
+        this.headTargetZ = Math.sin(this.speakPhase * 0.3) * 0.04;
+        this.spineTargetX = Math.sin(this.speakPhase * 0.5) * 0.03;
         this.chestTargetX = 0.02;
-        // Expressive gestures
-        this.lUpperTargetX = -0.3 + Math.sin(this.speakPhase * 0.7) * 0.15;
-        this.lUpperTargetZ = -0.7 - Math.sin(this.speakPhase * 0.5) * 0.2;
-        this.rUpperTargetX = -0.3 + Math.sin(this.speakPhase * 0.7 + 0.8) * 0.15;
-        this.rUpperTargetZ = 0.7 + Math.sin(this.speakPhase * 0.5 + 0.8) * 0.2;
-        this.lLowerTargetX = -0.6 + Math.sin(this.speakPhase) * 0.2;
-        this.rLowerTargetX = -0.6 + Math.sin(this.speakPhase + Math.PI) * 0.2;
+        // Subtle hand gestures while talking
+        this.lUpperTargetX = -0.2 + Math.sin(this.speakPhase * 0.7) * 0.12;
+        this.lUpperTargetZ = -1.0 + Math.sin(this.speakPhase * 0.5) * 0.15;
+        this.rUpperTargetX = -0.2 + Math.sin(this.speakPhase * 0.7 + 0.8) * 0.12;
+        this.rUpperTargetZ = 1.0 - Math.sin(this.speakPhase * 0.5 + 0.8) * 0.15;
+        this.lLowerTargetX = -0.6 + Math.sin(this.speakPhase) * 0.15;
+        this.rLowerTargetX = -0.6 + Math.sin(this.speakPhase + Math.PI) * 0.15;
         break;
       }
       case 'executing': {
-        this.headTargetX = 0.05;
-        this.headTargetY = Math.sin(s * 0.8) * 0.2;
+        // Focused — looking at something, arms relaxed but alert
+        this.headTargetX = 0.06;
+        this.headTargetY = Math.sin(s * 0.8) * 0.15;
         this.headTargetZ = 0;
         this.spineTargetX = 0.04;
         this.chestTargetX = 0.02;
-        // Typing-ish — arms forward and slightly down
-        this.lUpperTargetX = 0.3;
+        this.lUpperTargetX = -0.3;
         this.lUpperTargetZ = -1.1;
-        this.rUpperTargetX = 0.3;
+        this.rUpperTargetX = -0.3;
         this.rUpperTargetZ = 1.1;
         this.lLowerTargetX = -0.8;
         this.rLowerTargetX = -0.8;
