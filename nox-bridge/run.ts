@@ -11,7 +11,7 @@
 import { readFileSync, existsSync, statSync } from 'fs';
 import path from 'path';
 
-const NOX_WS = 'ws://127.0.0.1:3200/ws/openclaw';
+const NOX_WS = 'wss://nox-stream-production.up.railway.app/ws/openclaw';
 
 // Find today's log file
 function getLogPath(): string {

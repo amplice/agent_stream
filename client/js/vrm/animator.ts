@@ -38,6 +38,28 @@ export class AvatarAnimator {
   constructor(vrm: VRM) {
     this.vrm = vrm;
     console.log('[animator] Procedural animator ready');
+
+    // Log default bone rotations so we know where T-pose actually is
+    setTimeout(() => {
+      const bones = ['leftUpperArm', 'rightUpperArm', 'leftLowerArm', 'rightLowerArm'];
+      for (const name of bones) {
+        const node = vrm.humanoid?.getNormalizedBoneNode(name as any);
+        if (node) {
+          const r = node.rotation;
+          console.log(`[bone-default] ${name}: x=${r.x.toFixed(3)} y=${r.y.toFixed(3)} z=${r.z.toFixed(3)}`);
+        }
+      }
+    }, 2000);
+
+    // Debug: [ and ] to nudge leftUpperArm Z, log current value
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '[' || e.key === ']') {
+        const delta = e.key === '[' ? -0.1 : 0.1;
+        this.lUpperTargetZ += delta;
+        this.rUpperTargetZ -= delta;
+        console.log(`[debug] lUpperZ=${this.lUpperTargetZ.toFixed(2)} rUpperZ=${this.rUpperTargetZ.toFixed(2)}`);
+      }
+    });
   }
 
   transition(state: StateName): void {
