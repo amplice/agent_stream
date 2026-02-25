@@ -196,12 +196,14 @@ async function bootstrap(): Promise<void> {
     projectContext.update(payload || {});
   });
 
-  // Narration — only fires when idle or transitioning
+  // Chat response from nox
+  ws.on('chat_response', (payload: any) => {
+    if (payload?.text) chat.addMessage('nox', payload.text);
+  });
+
+  // Narration — fires in any state
   ws.on('narrate', async (payload: any) => {
     if (!payload?.text) return;
-    // Only narrate if currently idle or just finished something
-    const currentState = document.getElementById('state-label')?.textContent ?? 'idle';
-    if (currentState !== 'idle' && currentState !== 'thinking') return;
 
     if (animator) animator.transition('speaking');
     subtitleRenderer.showSpeaking(payload.text);

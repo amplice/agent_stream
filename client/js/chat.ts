@@ -77,7 +77,7 @@ export class Chat {
 
   addMessage(sender: string, text: string): void {
     this.messages.push({ sender, text });
-    if (this.messages.length > 5) this.messages.shift();
+    if (this.messages.length > 20) this.messages.shift();
     this.render();
   }
 
