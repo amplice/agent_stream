@@ -120,7 +120,11 @@ async function bootstrap(): Promise<void> {
   ws.on('executing', (payload: any) => {
     if (animator) animator.transition('executing');
     setStateUI('executing');
-    if (payload?.command) { terminal.command(payload.command); screen.tool(payload.command); }
+    if (payload?.command) {
+      const label = payload.input ? `${payload.command} ${payload.input}` : payload.command;
+      terminal.command(label);
+      screen.tool(payload.command);
+    }
     if (payload?.output) terminal.output(payload.output);
   });
 

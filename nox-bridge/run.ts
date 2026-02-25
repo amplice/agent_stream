@@ -1,22 +1,46 @@
 /**
- * nox-bridge/run.ts — tails the OpenClaw log and sends real events to the Nox server
+ * nox-bridge/run.ts
  *
- * Log events we care about (all JSONL, field "1" is the message string):
- *   embedded run agent start      → thinking
- *   embedded run tool start       → executing (with tool name extracted)
- *   telegram sendMessage ok       → speaking
- *   embedded run done             → idle
+ * Polls the real OpenClaw session transcript via /tools/invoke
+ * and streams actual tool calls + outputs to the nox server.
+ *
+ * Events sent to /ws/openclaw:
+ *   { type: 'thinking' }
+ *   { type: 'executing', payload: { command: 'exec', input: 'git push ...' } }
+ *   { type: 'tool_result', payload: { output: '...' } }
+ *   { type: 'speaking', payload: { text: '...' } }
+ *   { type: 'idle' }
  */
 
-import { readFileSync, existsSync, statSync } from 'fs';
-import path from 'path';
-
 const NOX_WS = 'wss://nox-stream-production.up.railway.app/ws/openclaw';
+const GATEWAY = 'http://127.0.0.1:18789';
+const GW_TOKEN = '377b9799e11a9dfa71e24b10f680b270332d9eeb39da9e36';
+const SESSION_KEY = 'agent:main:main';
+const POLL_MS = 600;
 
-// Find today's log file
-function getLogPath(): string {
-  const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  return `/tmp/openclaw/openclaw-${date}.log`;
+// Max chars of tool input/output to show
+const MAX_INPUT = 120;
+const MAX_OUTPUT = 200;
+
+function truncate(s: string, max: number): string {
+  if (!s) return '';
+  const clean = s.replace(/\n+/g, ' ').trim();
+  return clean.length > max ? clean.slice(0, max) + '…' : clean;
+}
+
+async function gwInvoke(tool: string, args: Record<string, unknown>): Promise<unknown> {
+  const res = await fetch(`${GATEWAY}/tools/invoke`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${GW_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ tool, args }),
+  });
+  if (!res.ok) throw new Error(`gateway ${res.status}`);
+  const data = await res.json() as { ok: boolean; result?: { details?: unknown } };
+  if (!data.ok) throw new Error('gateway error');
+  return (data.result as any)?.details ?? null;
 }
 
 function send(ws: WebSocket, type: string, payload: unknown = {}) {
@@ -25,119 +49,148 @@ function send(ws: WebSocket, type: string, payload: unknown = {}) {
   }
 }
 
-function parseLine(line: string): { type: string; payload: unknown } | null {
-  if (!line.trim()) return null;
-  try {
-    const obj = JSON.parse(line);
-    const msg: string = obj['1'] ?? '';
-
-    // agent start → thinking
-    if (msg.includes('embedded run agent start')) {
-      return { type: 'thinking', payload: { text: 'processing...' } };
-    }
-
-    // tool start → executing
-    const toolMatch = msg.match(/embedded run tool start:.*tool=(\S+)/);
-    if (toolMatch) {
-      const tool = toolMatch[1];
-      // Map tool names to display labels
-      const labels: Record<string, string> = {
-        exec: 'exec', read: 'read', write: 'write', edit: 'edit',
-        web_search: 'web_search', web_fetch: 'web_fetch',
-        browser: 'browser', message: 'message', memory_search: 'memory_search',
-      };
-      const label = labels[tool] ?? tool;
-      return { type: 'executing', payload: { command: label } };
-    }
-
-    // telegram message sent → speaking (agent replied)
-    if (msg.includes('telegram sendMessage ok')) {
-      return { type: 'speaking', payload: { text: '' } };
-    }
-
-    // run done → idle (after short delay to let speaking render)
-    if (msg.includes('embedded run done')) {
-      return { type: 'idle', payload: {} };
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
+function getToolInput(block: any): string {
+  const inp = block.input;
+  if (!inp) return '';
+  if (typeof inp === 'string') return inp;
+  // For exec: show command
+  if (inp.command) return inp.command;
+  // For read/write/edit: show path
+  if (inp.file_path || inp.path) return inp.file_path ?? inp.path;
+  // For web_search: show query
+  if (inp.query) return inp.query;
+  // For web_fetch: show url
+  if (inp.url) return inp.url;
+  // Generic: first string value
+  const vals = Object.values(inp).filter(v => typeof v === 'string');
+  if (vals.length) return vals[0] as string;
+  return JSON.stringify(inp).slice(0, MAX_INPUT);
 }
+
+function getToolOutput(block: any): string {
+  const content = block.content;
+  if (!content) return '';
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    const text = content
+      .filter((c: any) => c.type === 'text')
+      .map((c: any) => c.text ?? '')
+      .join(' ');
+    return text;
+  }
+  return '';
+}
+
+type Message = {
+  role: string;
+  content: any;
+};
 
 async function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms));
 }
 
 async function main() {
-  console.log('[bridge] starting — connecting to', NOX_WS);
+  console.log('[bridge] connecting to', NOX_WS);
 
-  const ws = new WebSocket(NOX_WS);
+  let ws: WebSocket | null = null;
+  let wsReady = false;
 
-  await new Promise<void>((resolve, reject) => {
-    ws.onopen = () => { console.log('[bridge] connected'); resolve(); };
-    ws.onerror = (e) => reject(new Error('ws error'));
-    setTimeout(() => reject(new Error('connect timeout')), 5000);
-  });
+  function connect() {
+    ws = new WebSocket(NOX_WS);
+    ws.onopen = () => { wsReady = true; console.log('[bridge] ws connected'); };
+    ws.onclose = () => { wsReady = false; console.log('[bridge] ws closed, reconnecting...'); setTimeout(connect, 2000); };
+    ws.onerror = () => { wsReady = false; };
+  }
+  connect();
 
-  // Start tailing log
-  let logPath = getLogPath();
-  let offset = existsSync(logPath) ? statSync(logPath).size : 0;
-  console.log(`[bridge] tailing ${logPath} from offset ${offset}`);
+  // Wait for ws
+  for (let i = 0; i < 20 && !wsReady; i++) await sleep(500);
+  if (!wsReady) { console.error('[bridge] ws never connected'); process.exit(1); }
 
-  let lastSpeakTime = 0;
+  let lastMessageCount = 0;
   let idleTimeout: ReturnType<typeof setTimeout> | null = null;
+  let currentState = 'idle';
 
-  function scheduleIdle() {
-    if (idleTimeout) clearTimeout(idleTimeout);
-    idleTimeout = setTimeout(() => {
-      send(ws, 'idle', {});
-    }, 2000);
+  function setState(state: string, payload: unknown = {}) {
+    if (idleTimeout) { clearTimeout(idleTimeout); idleTimeout = null; }
+    currentState = state;
+    if (ws && wsReady) send(ws, state, payload);
+    if (state !== 'idle' && state !== 'thinking') {
+      idleTimeout = setTimeout(() => {
+        if (ws && wsReady) send(ws, 'idle', {});
+        currentState = 'idle';
+      }, 8000);
+    }
   }
 
+  console.log('[bridge] polling session:', SESSION_KEY);
+
   while (true) {
-    // Rotate log path at midnight
-    const todayPath = getLogPath();
-    if (todayPath !== logPath) {
-      logPath = todayPath;
-      offset = 0;
-      console.log(`[bridge] rotated to ${logPath}`);
-    }
+    try {
+      if (!wsReady) { await sleep(POLL_MS); continue; }
 
-    if (!existsSync(logPath)) {
-      await sleep(1000);
-      continue;
-    }
+      const data = await gwInvoke('sessions_history', {
+        sessionKey: SESSION_KEY,
+        limit: 30,
+        includeTools: true,
+      }) as { messages?: Message[] } | null;
 
-    const size = statSync(logPath).size;
-    if (size > offset) {
-      const buf = readFileSync(logPath);
-      const newData = buf.slice(offset, size).toString('utf8');
-      offset = size;
+      const messages: Message[] = data?.messages ?? [];
+      if (messages.length === 0) { await sleep(POLL_MS); continue; }
 
-      const lines = newData.split('\n');
-      for (const line of lines) {
-        const event = parseLine(line);
-        if (!event) continue;
+      if (messages.length === lastMessageCount) {
+        await sleep(POLL_MS);
+        continue;
+      }
 
-        // Coalesce rapid tool-start events — only send every 200ms
-        if (event.type === 'executing') {
-          send(ws, event.type, event.payload);
-        } else if (event.type === 'speaking') {
-          const now = Date.now();
-          if (now - lastSpeakTime > 500) {
-            lastSpeakTime = now;
-            send(ws, 'speaking', event.payload);
-            scheduleIdle();
+      // Process new messages
+      const newMessages = lastMessageCount === 0
+        ? [] // skip on first load to avoid spamming old history
+        : messages.slice(lastMessageCount);
+
+      lastMessageCount = messages.length;
+
+      for (const msg of newMessages) {
+        const content = msg.content;
+        if (!Array.isArray(content)) continue;
+
+        for (const block of content) {
+          if (!block || typeof block !== 'object') continue;
+
+          const type = block.type;
+
+          if (type === 'thinking' || type === 'text') {
+            // Assistant is writing/thinking — speaking state
+            if (msg.role === 'assistant') {
+              const text = truncate(block.text ?? '', MAX_OUTPUT);
+              setState('speaking', { text });
+            }
           }
-        } else {
-          send(ws, event.type, event.payload);
+
+          if (type === 'tool_use' || type === 'toolCall') {
+            const toolName = block.name ?? block.tool ?? 'tool';
+            const input = truncate(getToolInput(block), MAX_INPUT);
+            setState('executing', { command: toolName, input });
+          }
+
+          if (type === 'tool_result' || type === 'toolResult') {
+            const output = truncate(getToolOutput(block), MAX_OUTPUT);
+            setState('tool_result', { output });
+          }
+        }
+
+        // User message = model is about to think
+        if (msg.role === 'user') {
+          setState('thinking', {});
         }
       }
+
+    } catch (e) {
+      // swallow poll errors
     }
 
-    await sleep(150);
+    await sleep(POLL_MS);
   }
 }
 
