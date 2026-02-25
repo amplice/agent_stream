@@ -6,7 +6,7 @@
  * Also generates periodic narration of what's happening.
  */
 
-const NOX_WS = 'wss://nox-stream-production.up.railway.app/ws/openclaw';
+const NOX_WS = process.env.NOX_WS || 'ws://127.0.0.1:3200/ws/openclaw';
 const GATEWAY = 'http://127.0.0.1:18789';
 const GW_TOKEN = '377b9799e11a9dfa71e24b10f680b270332d9eeb39da9e36';
 const SESSION_KEY = 'agent:main:main';

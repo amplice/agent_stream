@@ -9,4 +9,6 @@ export const config = {
   chatMaxLength: parseInt(process.env.CHAT_MAX_LENGTH || '280', 10),
   chatRateLimit: parseInt(process.env.CHAT_RATE_LIMIT || '3', 10),
   chatRateWindowMs: 10000,
+  gatewayUrl: process.env.GATEWAY_URL || 'http://127.0.0.1:18789',
+  gatewayToken: process.env.GATEWAY_TOKEN || '',
 };
