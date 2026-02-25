@@ -14,7 +14,7 @@ export class Chat {
   private viewerCountEl: HTMLElement;
   private ws: WSClient;
   private messages: ChatMessage[] = [];
-  private visible = false;
+  private visible = true;  // visible by default
   private viewerCount = Math.floor(12 + Math.random() * 8);
 
   constructor(ws: WSClient) {
@@ -34,6 +34,7 @@ export class Chat {
       </div>
     `;
     document.body.appendChild(this.el);
+    this.el.classList.add('visible'); // start visible
 
     this.messagesEl = this.el.querySelector('#chat-messages')!;
     this.inputEl = this.el.querySelector('#chat-input')!;

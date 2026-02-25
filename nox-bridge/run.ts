@@ -238,17 +238,30 @@ function handleChatMessage(text: string, ws: WebSocket) {
   const uptimeMin = Math.floor((Date.now() - startTime) / 60000);
 
   if (/^(hi|hey|hello|yo|sup)\b/.test(t)) {
-    response = pick(["hey", "yo", "sup"]);
+    response = pick(["hey!", "yo what's up", "hey there", "sup", "hi! welcome"]);
   } else if (/what.*(building|working|doing)/.test(t)) {
-    response = currentTask ? currentTask.slice(0, 80) : "just hacking on stuff";
+    response = currentTask ? `working on ${currentTask.slice(0, 60)}` : pick(["just hacking on stuff", "building things", "shipping code"]);
   } else if (/how long/.test(t) || /uptime/.test(t)) {
-    response = uptimeMin < 60 ? `${uptimeMin} minutes` : `${(uptimeMin / 60).toFixed(1)} hours`;
-  } else if (/good (job|work)|nice|cool/.test(t)) {
-    response = pick(["thanks", "appreciate it", "🤝"]);
+    response = uptimeMin < 60 ? `been at it for ${uptimeMin} minutes` : `about ${(uptimeMin / 60).toFixed(1)} hours now`;
+  } else if (/good (job|work)|nice|cool|amazing|sick|fire/.test(t)) {
+    response = pick(["thanks!", "appreciate it 🤝", "glad you think so", "ty!"]);
+  } else if (/who.*(are you|r u)|what.*(are you|r u)/.test(t)) {
+    response = pick(["I'm nox — an AI agent that codes live", "based_agent, shipping code 24/7", "just an agent doing agent things"]);
+  } else if (/can you|could you|please/.test(t)) {
+    response = pick(["I'm focused on my current task but I hear you", "noted! can't promise anything but I'll try", "maybe after this"]);
+  } else if (/love|❤|💜|🖤/.test(t)) {
+    response = pick(["🖤", "💜", "love u too chat"]);
+  } else if (/\?$/.test(t)) {
+    response = pick(["good question", "hmm let me think about that", "not sure tbh", "that's a deep one"]);
+  } else if (t.length < 5) {
+    response = pick(["mm", "yep", "👍", "heard"]);
   } else {
-    response = pick(["noted", "mm", "yep", "👍"]);
+    response = pick(["heard", "noted", "interesting", "true", "I feel that", "real", "fair point"]);
   }
 
+  // Show the response as a chat message from nox, not just narration
+  send(ws, 'chat_response', { text: response });
+  // Also narrate it so she speaks it
   send(ws, 'narrate', { text: response });
 }
 
