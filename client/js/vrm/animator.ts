@@ -27,9 +27,9 @@ export class AvatarAnimator {
   private headTargetZ = 0;
   private spineTargetX = 0;
   private chestTargetX = 0;
-  // Left Z+ = down, Right Z- = down. π/2 ≈ 1.5708 = arms at sides
-  private lUpperTargetX = 0; private lUpperTargetZ = 1.57;
-  private rUpperTargetX = 0; private rUpperTargetZ = -1.57;
+  // CORRECT AXIS: Y rotation swings arms. Left Y+ = down, Right Y- = down
+  private lUpperTargetX = 0; private lUpperTargetY = 1.4; private lUpperTargetZ = 0;
+  private rUpperTargetX = 0; private rUpperTargetY = -1.4; private rUpperTargetZ = 0;
   private lLowerTargetX = 0;
   private rLowerTargetX = 0;
 
@@ -48,8 +48,7 @@ export class AvatarAnimator {
 
   constructor(vrm: VRM) {
     this.vrm = vrm;
-    console.log('[animator] BUILD: v9 — setNormalizedPose, keyboard axis test');
-    console.log('[animator] Keys: 1-6 = test arm axes (+X,-X,+Y,-Y,+Z,-Z), [/] = adjust angle');
+    console.log('[animator] BUILD: v10 — Y axis confirmed for arm swing, all states fixed');
     console.log('[animator] Procedural animator ready');
 
     // Test mode: cycle through axes
@@ -152,32 +151,37 @@ export class AvatarAnimator {
 
     switch (this.state) {
       case 'idle': {
+        // Arms relaxed at sides with subtle breathing sway
         this.headTargetX = Math.sin(s * 0.7) * 0.04;
         this.headTargetY = Math.sin(s * 0.3) * 0.08;
         this.headTargetZ = Math.sin(s * 0.4) * 0.02;
         this.spineTargetX = Math.sin(s * 0.6) * 0.02;
         this.chestTargetX = Math.sin(s * 0.5) * 0.03;
         this.lUpperTargetX = 0;
-        this.lUpperTargetZ = 1.57;
+        this.lUpperTargetY = 1.4 + Math.sin(s * 0.3) * 0.03;
+        this.lUpperTargetZ = 0;
         this.rUpperTargetX = 0;
-        this.rUpperTargetZ = -1.57;
-        this.lLowerTargetX = 0;
-        this.rLowerTargetX = 0;
+        this.rUpperTargetY = -1.4 - Math.sin(s * 0.3) * 0.03;
+        this.rUpperTargetZ = 0;
+        this.lLowerTargetX = -0.3;
+        this.rLowerTargetX = -0.3;
         break;
       }
       case 'thinking': {
-        // Right hand raised to chin, left arm relaxed
+        // Right hand raised toward chin, left arm relaxed at side
         this.headTargetX = 0.08;
         this.headTargetY = Math.sin(s * 0.25) * 0.12;
         this.headTargetZ = 0.06;
         this.spineTargetX = 0.04;
         this.chestTargetX = 0.02;
-        this.lUpperTargetX = 0.15;
-        this.lUpperTargetZ = 1.3;   // left arm at side
-        this.rUpperTargetX = -0.6;
-        this.rUpperTargetZ = -0.5;  // right arm raised
+        this.lUpperTargetX = 0;
+        this.lUpperTargetY = 1.3;
+        this.lUpperTargetZ = 0;
+        this.rUpperTargetX = -0.5;  // arm forward
+        this.rUpperTargetY = -0.5;  // partially raised
+        this.rUpperTargetZ = 0;
         this.lLowerTargetX = -0.3;
-        this.rLowerTargetX = -1.4;  // right elbow bent toward chin
+        this.rLowerTargetX = -1.4;  // elbow bent
         break;
       }
       case 'typing': {
@@ -189,10 +193,12 @@ export class AvatarAnimator {
         this.spineTargetX = 0.06;
         this.chestTargetX = 0.04;
         // Arms forward for keyboard
-        this.lUpperTargetX = 0.5 + Math.sin(this.typingPhase) * 0.05;
-        this.lUpperTargetZ = 0.7;
-        this.rUpperTargetX = 0.5 + Math.sin(this.typingPhase + Math.PI) * 0.05;
-        this.rUpperTargetZ = -0.7;
+        this.lUpperTargetX = -0.5 + Math.sin(this.typingPhase) * 0.05;
+        this.lUpperTargetY = 0.8;
+        this.lUpperTargetZ = 0;
+        this.rUpperTargetX = -0.5 + Math.sin(this.typingPhase + Math.PI) * 0.05;
+        this.rUpperTargetY = -0.8;
+        this.rUpperTargetZ = 0;
         this.lLowerTargetX = -1.2 + Math.sin(this.typingPhase) * 0.06;
         this.rLowerTargetX = -1.2 + Math.sin(this.typingPhase + Math.PI) * 0.06;
         break;
@@ -204,26 +210,30 @@ export class AvatarAnimator {
         this.headTargetZ = Math.sin(this.speakPhase * 0.3) * 0.04;
         this.spineTargetX = Math.sin(this.speakPhase * 0.5) * 0.03;
         this.chestTargetX = 0.02;
-        // Subtle gestures while talking — arms mostly at sides with movement
-        this.lUpperTargetX = 0.1 + Math.sin(this.speakPhase * 0.7) * 0.12;
-        this.lUpperTargetZ = 1.0 + Math.sin(this.speakPhase * 0.5) * 0.15;
-        this.rUpperTargetX = 0.1 + Math.sin(this.speakPhase * 0.7 + 0.8) * 0.12;
-        this.rUpperTargetZ = -1.0 - Math.sin(this.speakPhase * 0.5 + 0.8) * 0.15;
-        this.lLowerTargetX = -0.5 + Math.sin(this.speakPhase) * 0.15;
-        this.rLowerTargetX = -0.5 + Math.sin(this.speakPhase + Math.PI) * 0.15;
+        // Subtle gestures while talking
+        this.lUpperTargetX = Math.sin(this.speakPhase * 0.7) * 0.15;
+        this.lUpperTargetY = 1.0 + Math.sin(this.speakPhase * 0.5) * 0.2;
+        this.lUpperTargetZ = 0;
+        this.rUpperTargetX = Math.sin(this.speakPhase * 0.7 + 0.8) * 0.15;
+        this.rUpperTargetY = -1.0 - Math.sin(this.speakPhase * 0.5 + 0.8) * 0.2;
+        this.rUpperTargetZ = 0;
+        this.lLowerTargetX = -0.4 + Math.sin(this.speakPhase) * 0.1;
+        this.rLowerTargetX = -0.4 + Math.sin(this.speakPhase + Math.PI) * 0.1;
         break;
       }
       case 'executing': {
-        // Focused — arms in front, working on something
+        // Focused — arms partially forward
         this.headTargetX = 0.06;
         this.headTargetY = Math.sin(s * 0.8) * 0.15;
         this.headTargetZ = 0;
         this.spineTargetX = 0.04;
         this.chestTargetX = 0.02;
-        this.lUpperTargetX = 0.4;
-        this.lUpperTargetZ = 0.9;
-        this.rUpperTargetX = 0.4;
-        this.rUpperTargetZ = -0.9;
+        this.lUpperTargetX = -0.4;
+        this.lUpperTargetY = 0.9;
+        this.lUpperTargetZ = 0;
+        this.rUpperTargetX = -0.4;
+        this.rUpperTargetY = -0.9;
+        this.rUpperTargetZ = 0;
         this.lLowerTargetX = -0.8;
         this.rLowerTargetX = -0.8;
         break;
@@ -264,12 +274,14 @@ export class AvatarAnimator {
     // But this moved arms forward in our test. So the "down" direction 
     // might be -Y local. Let's use setNormalizedPose and try all axes.
     
-    // Use testAxis/testAngle for interactive debugging
-    const luTarget = new THREE.Quaternion().setFromAxisAngle(this.testAxis, this.testAngle);
-    const ruTarget = new THREE.Quaternion().setFromAxisAngle(this.testAxis, -this.testAngle);
+    // Build arm quaternion: Y = swing down/up, X = forward/back, Z = twist
+    const luTarget = new THREE.Quaternion()
+      .setFromEuler(new THREE.Euler(this.lUpperTargetX, this.lUpperTargetY, this.lUpperTargetZ, 'YXZ'));
+    const ruTarget = new THREE.Quaternion()
+      .setFromEuler(new THREE.Euler(this.rUpperTargetX, this.rUpperTargetY, this.rUpperTargetZ, 'YXZ'));
     
-    this.luCurrent.slerp(luTarget, 0.15);
-    this.ruCurrent.slerp(ruTarget, 0.15);
+    this.luCurrent.slerp(luTarget, 0.1);
+    this.ruCurrent.slerp(ruTarget, 0.1);
 
     _q.setFromAxisAngle(_axis.set(1, 0, 0), this.lLowerTargetX);
     const llQ: [number, number, number, number] = [_q.x, _q.y, _q.z, _q.w];
