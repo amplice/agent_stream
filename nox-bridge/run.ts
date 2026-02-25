@@ -26,9 +26,9 @@ let toolCallCount = 0;
 let lastToolName = '';
 
 // Min/max gap between narrations (ms)
-const NARRATION_MIN_MS = 25_000;
-const NARRATION_MAX_MS = 55_000;
-let nextNarrationAt = Date.now() + 15_000; // first one after 15s
+const NARRATION_MIN_MS = 10_000;
+const NARRATION_MAX_MS = 25_000;
+let nextNarrationAt = Date.now() + 8_000; // first one after 8s
 
 function pushActivity(tool: string, input: string) {
   recentActivity.push({ tool, input, ts: Date.now() });
@@ -62,10 +62,16 @@ function generateNarration(): string | null {
 
   const recent = recentActivity.filter(a => now - a.ts < 60_000);
 
+  const gap = () => NARRATION_MIN_MS + Math.random() * (NARRATION_MAX_MS - NARRATION_MIN_MS);
+
   // Rapid tool calls
   if (toolCallCount >= 5) {
-    nextNarrationAt = now + NARRATION_MIN_MS + Math.random() * (NARRATION_MAX_MS - NARRATION_MIN_MS);
-    const rapidLines = ["on a roll", "going fast right now", "lots to do", "shipping"];
+    nextNarrationAt = now + gap();
+    const rapidLines = [
+      "on a roll right now", "going fast", "lots happening", "shipping mode activated",
+      "ok this is coming together", "cranking through this", "momentum is good",
+      "just banging through these changes", "this is the fun part"
+    ];
     toolCallCount = 0;
     recentActivity.length = 0;
     return pick(rapidLines);
@@ -73,19 +79,33 @@ function generateNarration(): string | null {
 
   // Recent error
   if (lastExitCode !== null && lastExitCode !== 0) {
-    nextNarrationAt = now + NARRATION_MIN_MS + Math.random() * (NARRATION_MAX_MS - NARRATION_MIN_MS);
+    nextNarrationAt = now + gap();
     lastExitCode = null;
     recentActivity.length = 0;
     toolCallCount = 0;
-    return pick(["that errored. let me look at this", "hm, that didn't work", "ok something broke", "fuck. let me fix this"]);
+    return pick([
+      "that errored. let me look at this", "hm, that didn't work", "ok something broke",
+      "fuck. let me fix this", "alright, not what I expected", "that's not right",
+      "ok hold on, something's off", "debugging time I guess", "classic"
+    ]);
   }
 
   if (recent.length === 0 && !currentTask) {
-    // Long idle
-    if (now - lastIdleNarrationAt > 30_000) {
+    // Idle — muse, think out loud, be present
+    if (now - lastIdleNarrationAt > 15_000) {
       lastIdleNarrationAt = now;
-      nextNarrationAt = now + NARRATION_MIN_MS + Math.random() * (NARRATION_MAX_MS - NARRATION_MIN_MS);
-      return pick(["thinking", "...", "working through this", "hold on"]);
+      nextNarrationAt = now + gap();
+      const uptimeMin = Math.floor((now - startTime) / 60000);
+      const idleLines = [
+        "thinking about what to do next", "just vibing", "processing",
+        "kinda quiet right now", "between tasks", "waiting for inspiration to strike",
+        "should probably do something productive", "idle hands...",
+        "anyone watching? say hi", "what should I build next",
+        uptimeMin > 30 ? `been at it for ${uptimeMin} minutes` : "still warming up",
+        "the eternal question... what to ship next", "contemplating the void",
+        "I could start something new", "checking if anything needs attention"
+      ];
+      return pick(idleLines);
     }
     return null;
   }
@@ -102,40 +122,46 @@ function generateNarration(): string | null {
   if (domTool === 'exec') {
     const cmd = lastInput.trim();
     const firstWord = cmd.split(' ')[0].split('/').pop() || 'something';
-    if (/^git\s+push/.test(cmd)) lines.push("pushing to main", "pushing this up");
-    else if (/^git\s+commit/.test(cmd)) lines.push("just committed", "committing");
-    else if (/^git\s+(status|diff|log)/.test(cmd)) lines.push("checking git status", "looking at the diff");
+    if (/^git\s+push/.test(cmd)) lines.push("pushing to main", "and... shipped", "pushing this up, fingers crossed", "deploying");
+    else if (/^git\s+commit/.test(cmd)) lines.push("just committed that", "committing this chunk", "saving progress");
+    else if (/^git\s+(status|diff|log)/.test(cmd)) lines.push("checking the diff", "let me see what changed", "reviewing changes");
     else if (/^git\s+/.test(cmd)) lines.push(`git ${cmd.split(' ')[1] || 'stuff'}`);
-    else if (/^(bun|npm)\s+run\s+build/.test(cmd)) lines.push("building... let's see if this compiles", "build time");
-    else if (/^(bun|npm)\s+(install|add|i\b)/.test(cmd)) lines.push("installing deps", "adding a package");
+    else if (/^(bun|npm)\s+run\s+build/.test(cmd)) lines.push("building... moment of truth", "build time, please don't break", "compiling, let's see", "ok building this");
+    else if (/^(bun|npm)\s+(install|add|i\b)/.test(cmd)) lines.push("installing a dependency", "adding a package I need");
     else if (/^(bun|npm)\s+run/.test(cmd)) lines.push(`running ${cmd.split('run')[1]?.trim().split(' ')[0] || 'a script'}`);
-    else if (/^curl/.test(cmd)) lines.push("hitting an API", "making a request");
-    else if (/^(cat|head|tail|less)/.test(cmd)) lines.push("reading output");
-    else if (/^(grep|rg|find|fd)/.test(cmd)) lines.push("searching for something");
-    else lines.push(`running ${firstWord}`, `${firstWord}`);
+    else if (/^curl/.test(cmd)) lines.push("hitting an endpoint", "making a request, let's see what comes back");
+    else if (/^(cat|head|tail|less)/.test(cmd)) lines.push("checking the output", "reading this");
+    else if (/^(grep|rg|find|fd)/.test(cmd)) lines.push("searching for something specific", "digging through files");
+    else if (/^(kill|pkill)/.test(cmd)) lines.push("killing a process", "cleaning up");
+    else if (/^(ps|top|htop)/.test(cmd)) lines.push("checking what's running", "process check");
+    else if (/^(docker|podman)/.test(cmd)) lines.push("container stuff", "docker things");
+    else lines.push(`running ${firstWord}`, `doing some ${firstWord}`);
   } else if (domTool === 'Read' || domTool === 'read') {
     const file = lastInput.split('/').pop() ?? lastInput;
     const ft = fileType(file);
-    lines.push(`in ${file} right now`, `reading some ${ft}`, `looking at ${file}`);
+    lines.push(`reading ${file}`, `looking at this ${ft}`, `checking out ${file}`, `let me see what's in ${file}`);
   } else if (domTool === 'Edit' || domTool === 'edit') {
     const file = lastInput.split('/').pop() ?? lastInput;
-    const ft = fileType(file);
-    lines.push(`making some changes to ${file}`, `editing ${ft}`, `${file} needed fixing`);
+    lines.push(`editing ${file}`, `making changes here`, `fixing up ${file}`, `tweaking this`);
   } else if (domTool === 'Write' || domTool === 'write') {
     const file = lastInput.split('/').pop() ?? lastInput;
-    lines.push(`writing ${file}`, `creating ${file}`);
+    lines.push(`writing ${file}`, `creating ${file}`, `new file: ${file}`);
   } else if (domTool === 'web_search') {
     const q = lastInput.slice(0, 40);
-    lines.push("looking this up", q ? `googling ${q}` : "searching");
+    lines.push("looking this up real quick", q ? `searching for ${q}` : "researching", "let me google that");
   } else if (domTool === 'web_fetch') {
-    lines.push("pulling a page", "fetching something");
+    lines.push("pulling a page", "fetching some docs", "grabbing content");
   } else if (domTool === 'browser') {
-    lines.push("in the browser", "browsing");
+    lines.push("in the browser right now", "browsing", "checking something in the browser");
+  } else if (domTool === 'message') {
+    lines.push("sending a message", "messaging");
+  } else if (domTool === 'memory_search') {
+    lines.push("checking my memory", "what did I save about this", "searching my notes");
   } else if (currentTask) {
-    const t = currentTask.slice(0, 60);
-    lines.push(`working on ${t}`, `${t}`, "on it");
+    const t = currentTask.slice(0, 50);
+    lines.push(`working on: ${t}`, `focused on ${t}`, "making progress on this");
   } else {
-    lines.push("working", "on it", "doing things");
+    lines.push("working on something", "in the zone", "doing things", "making moves");
   }
 
   if (lines.length === 0) return null;
