@@ -46,19 +46,20 @@ export class AvatarAnimator {
 
   constructor(vrm: VRM) {
     this.vrm = vrm;
-    console.log('[animator] Procedural animator ready');
-
-    // Log default bone rotations so we know where T-pose actually is
-    setTimeout(() => {
-      const bones = ['leftUpperArm', 'rightUpperArm', 'leftLowerArm', 'rightLowerArm'];
-      for (const name of bones) {
-        const node = vrm.humanoid?.getNormalizedBoneNode(name as any);
-        if (node) {
-          const r = node.rotation;
-          console.log(`[bone-default] ${name}: x=${r.x.toFixed(3)} y=${r.y.toFixed(3)} z=${r.z.toFixed(3)}`);
+    // Log rest pose IMMEDIATELY before any animation runs
+    const allBones = ['hips', 'spine', 'chest', 'upperChest', 'neck', 'head',
+      'leftShoulder', 'rightShoulder', 'leftUpperArm', 'rightUpperArm',
+      'leftLowerArm', 'rightLowerArm', 'leftHand', 'rightHand'];
+    for (const name of allBones) {
+      const node = vrm.humanoid?.getNormalizedBoneNode(name as any);
+      if (node) {
+        const r = node.rotation;
+        if (Math.abs(r.x) > 0.001 || Math.abs(r.y) > 0.001 || Math.abs(r.z) > 0.001) {
+          console.log(`[rest-pose] ${name}: x=${r.x.toFixed(4)} y=${r.y.toFixed(4)} z=${r.z.toFixed(4)}`);
         }
       }
-    }, 2000);
+    }
+    console.log('[animator] Procedural animator ready (rest pose logged above)');
 
     // Debug: [ = arms more down, ] = arms more up
     window.addEventListener('keydown', (e) => {
