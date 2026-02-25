@@ -24,12 +24,11 @@ export class AvatarAnimator {
   private headTargetZ = 0;
   private spineTargetX = 0;
   private chestTargetX = 0;
-  // Axis confirmed: left Z+ = down, right Z- = down
-  // +0.5/-0.5 = slight angle down from T-pose. ~1.4 = arms at sides.
-  private lUpperTargetX = 0.2; private lUpperTargetZ = 1.4;
-  private rUpperTargetX = 0.2; private rUpperTargetZ = -1.4;
-  private lLowerTargetX = -0.3;
-  private rLowerTargetX = -0.3;
+  // Left Z+ = down, Right Z- = down. π/2 ≈ 1.5708 = arms at sides
+  private lUpperTargetX = 0; private lUpperTargetZ = 1.57;
+  private rUpperTargetX = 0; private rUpperTargetZ = -1.57;
+  private lLowerTargetX = 0;
+  private rLowerTargetX = 0;
 
   // Phases
   private swayPhase = Math.random() * Math.PI * 2;
@@ -46,20 +45,8 @@ export class AvatarAnimator {
 
   constructor(vrm: VRM) {
     this.vrm = vrm;
-    // Log rest pose IMMEDIATELY before any animation runs
-    const allBones = ['hips', 'spine', 'chest', 'upperChest', 'neck', 'head',
-      'leftShoulder', 'rightShoulder', 'leftUpperArm', 'rightUpperArm',
-      'leftLowerArm', 'rightLowerArm', 'leftHand', 'rightHand'];
-    for (const name of allBones) {
-      const node = vrm.humanoid?.getNormalizedBoneNode(name as any);
-      if (node) {
-        const r = node.rotation;
-        if (Math.abs(r.x) > 0.001 || Math.abs(r.y) > 0.001 || Math.abs(r.z) > 0.001) {
-          console.log(`[rest-pose] ${name}: x=${r.x.toFixed(4)} y=${r.y.toFixed(4)} z=${r.z.toFixed(4)}`);
-        }
-      }
-    }
-    console.log('[animator] Procedural animator ready (rest pose logged above)');
+    console.log('[animator] BUILD: v7 — lZ=+1.57 rZ=-1.57 (arms down)');
+    console.log('[animator] Procedural animator ready');
 
     // Debug: [ = arms more down, ] = arms more up
     window.addEventListener('keydown', (e) => {
@@ -138,18 +125,17 @@ export class AvatarAnimator {
 
     switch (this.state) {
       case 'idle': {
-        // Arms relaxed at sides, subtle breathing sway
         this.headTargetX = Math.sin(s * 0.7) * 0.04;
         this.headTargetY = Math.sin(s * 0.3) * 0.08;
         this.headTargetZ = Math.sin(s * 0.4) * 0.02;
         this.spineTargetX = Math.sin(s * 0.6) * 0.02;
         this.chestTargetX = Math.sin(s * 0.5) * 0.03;
-        this.lUpperTargetX = 0.2 + Math.sin(s * 0.4) * 0.03;
-        this.lUpperTargetZ = 1.4 + Math.sin(s * 0.3) * 0.04;
-        this.rUpperTargetX = 0.2 + Math.sin(s * 0.4 + 0.5) * 0.03;
-        this.rUpperTargetZ = -1.4 - Math.sin(s * 0.3) * 0.04;
-        this.lLowerTargetX = -0.3;
-        this.rLowerTargetX = -0.3;
+        this.lUpperTargetX = 0;
+        this.lUpperTargetZ = 1.57;
+        this.rUpperTargetX = 0;
+        this.rUpperTargetZ = -1.57;
+        this.lLowerTargetX = 0;
+        this.rLowerTargetX = 0;
         break;
       }
       case 'thinking': {
