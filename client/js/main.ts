@@ -158,6 +158,35 @@ async function bootstrap(): Promise<void> {
     if (payload?.text) setTask(payload.text);
   });
 
+  // Narration — only fires when idle or transitioning
+  ws.on('narrate', async (payload: any) => {
+    if (!payload?.text) return;
+    // Only narrate if currently idle or just finished something
+    const currentState = document.getElementById('state-label')?.textContent ?? 'idle';
+    if (currentState !== 'idle' && currentState !== 'thinking') return;
+
+    if (animator) animator.transition('speaking');
+    subtitleRenderer.showSpeaking(payload.text);
+    setStateUI('speaking');
+
+    if (payload?.audioUrl) {
+      try {
+        await audioPlayer.play(payload.audioUrl);
+        if (lipSync) {
+          if (payload.phonemes?.length > 0) lipSync.startWithPhonemes(payload.phonemes, audioPlayer);
+          else lipSync.startAmplitude(audioPlayer);
+        }
+      } catch {}
+    } else {
+      // No audio — show subtitle for 3s then return to idle
+      setTimeout(() => {
+        subtitleRenderer.clear();
+        if (animator) animator.transition('idle');
+        setStateUI('idle');
+      }, 3500);
+    }
+  });
+
   ws.on('idle', () => {
     particleSystem.setMode('ambient');
     if (animator) animator.transition('idle');

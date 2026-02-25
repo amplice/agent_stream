@@ -31,8 +31,8 @@ export async function eventRouter(event: NoxEvent) {
   }
   console.log(`[eventRouter] ${event.type}`);
 
-  // Enrich 'speaking' events with TTS
-  if (event.type === 'speaking' && event.payload && typeof event.payload === 'object') {
+  // Enrich 'speaking' and 'narrate' events with TTS
+  if ((event.type === 'speaking' || event.type === 'narrate') && event.payload && typeof event.payload === 'object') {
     const payload = event.payload as Record<string, unknown>;
     if (payload.text && typeof payload.text === 'string') {
       try {
