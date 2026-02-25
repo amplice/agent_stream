@@ -210,12 +210,12 @@ export class AvatarAnimator {
         this.headTargetZ = Math.sin(this.speakPhase * 0.3) * 0.04;
         this.spineTargetX = Math.sin(this.speakPhase * 0.5) * 0.03;
         this.chestTargetX = 0.02;
-        // Subtle gestures while talking
-        this.lUpperTargetX = Math.sin(this.speakPhase * 0.7) * 0.15;
-        this.lUpperTargetY = -1.0 + Math.sin(this.speakPhase * 0.5) * 0.2;
+        // Subtle gestures while talking — arms mostly at sides
+        this.lUpperTargetX = Math.sin(this.speakPhase * 0.7) * 0.08;
+        this.lUpperTargetY = -1.3 + Math.sin(this.speakPhase * 0.5) * 0.1;
         this.lUpperTargetZ = 0;
-        this.rUpperTargetX = Math.sin(this.speakPhase * 0.7 + 0.8) * 0.15;
-        this.rUpperTargetY = 1.0 - Math.sin(this.speakPhase * 0.5 + 0.8) * 0.2;
+        this.rUpperTargetX = Math.sin(this.speakPhase * 0.7 + 0.8) * 0.08;
+        this.rUpperTargetY = 1.3 - Math.sin(this.speakPhase * 0.5 + 0.8) * 0.1;
         this.rUpperTargetZ = 0;
         this.lLowerTargetX = -0.4 + Math.sin(this.speakPhase) * 0.1;
         this.rLowerTargetX = -0.4 + Math.sin(this.speakPhase + Math.PI) * 0.1;
