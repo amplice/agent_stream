@@ -17,17 +17,17 @@ export class AvatarAnimator {
   private blinkProgress = 0;
   private isBlinking = false;
 
-  // Smooth target rotations — init to natural rest (arms down)
-  // VRM normalized, no model Y-rotation: left Z- = down, right Z+ = down
+  // Smooth target rotations — VRoid normalized space
+  // T-pose = arms horizontal (identity). Arms down = rotate X forward (~+1.4 rad)
   private headTargetX = 0;
   private headTargetY = 0;
   private headTargetZ = 0;
   private spineTargetX = 0;
   private chestTargetX = 0;
-  private lUpperTargetX = 0; private lUpperTargetZ = -1.2;
-  private rUpperTargetX = 0; private rUpperTargetZ = 1.2;
-  private lLowerTargetX = -0.2;
-  private rLowerTargetX = -0.2;
+  private lUpperTargetX = 0; private lUpperTargetZ = -1.4;
+  private rUpperTargetX = 0; private rUpperTargetZ = 1.4;
+  private lLowerTargetX = 0.3;
+  private rLowerTargetX = 0.3;
 
   // Phases
   private swayPhase = Math.random() * Math.PI * 2;
@@ -133,18 +133,18 @@ export class AvatarAnimator {
 
     switch (this.state) {
       case 'idle': {
-        // Arms hanging at sides. No model Y-rotation: left Z- = down, right Z+ = down
+        // Arms hanging at sides — VRoid: Z rotates arm down from T-pose
         this.headTargetX = Math.sin(s * 0.7) * 0.04;
         this.headTargetY = Math.sin(s * 0.3) * 0.08;
         this.headTargetZ = Math.sin(s * 0.4) * 0.02;
         this.spineTargetX = Math.sin(s * 0.6) * 0.02;
         this.chestTargetX = Math.sin(s * 0.5) * 0.03;
-        this.lUpperTargetX = -0.1 + Math.sin(s * 0.4) * 0.03;
-        this.lUpperTargetZ = -1.2 + Math.sin(s * 0.3) * 0.05;
-        this.rUpperTargetX = -0.1 + Math.sin(s * 0.4 + 0.5) * 0.03;
-        this.rUpperTargetZ = 1.2 + Math.sin(s * 0.3) * 0.05;
-        this.lLowerTargetX = -0.3;
-        this.rLowerTargetX = -0.3;
+        this.lUpperTargetX = 0 + Math.sin(s * 0.4) * 0.03;
+        this.lUpperTargetZ = -1.4 + Math.sin(s * 0.3) * 0.05;
+        this.rUpperTargetX = 0 + Math.sin(s * 0.4 + 0.5) * 0.03;
+        this.rUpperTargetZ = 1.4 + Math.sin(s * 0.3) * 0.05;
+        this.lLowerTargetX = 0.3;
+        this.rLowerTargetX = 0.3;
         break;
       }
       case 'thinking': {
@@ -154,12 +154,12 @@ export class AvatarAnimator {
         this.headTargetZ = 0.08;
         this.spineTargetX = 0.04;
         this.chestTargetX = 0.02;
-        this.lUpperTargetX = -0.1;
-        this.lUpperTargetZ = -0.8;
-        this.rUpperTargetX = -0.8;
-        this.rUpperTargetZ = 0.4;
-        this.lLowerTargetX = -0.3;
-        this.rLowerTargetX = -1.2;
+        this.lUpperTargetX = 0;
+        this.lUpperTargetZ = -1.2;
+        this.rUpperTargetX = -0.8;  // raise right arm up
+        this.rUpperTargetZ = 0.6;
+        this.lLowerTargetX = 0.3;
+        this.rLowerTargetX = -1.0;  // bend elbow toward chin
         break;
       }
       case 'typing': {
@@ -196,17 +196,18 @@ export class AvatarAnimator {
         break;
       }
       case 'executing': {
-        this.headTargetX = 0;
-        this.headTargetY = Math.sin(s * 0.8) * 0.3;
+        this.headTargetX = 0.05;
+        this.headTargetY = Math.sin(s * 0.8) * 0.2;
         this.headTargetZ = 0;
-        this.spineTargetX = 0.02;
-        this.chestTargetX = 0;
-        this.lUpperTargetX = -0.2;
-        this.lUpperTargetZ = -0.9;
-        this.rUpperTargetX = -0.2;
-        this.rUpperTargetZ = 0.9;
-        this.lLowerTargetX = -0.4;
-        this.rLowerTargetX = -0.4;
+        this.spineTargetX = 0.04;
+        this.chestTargetX = 0.02;
+        // Typing-ish — arms forward and slightly down
+        this.lUpperTargetX = 0.3;
+        this.lUpperTargetZ = -1.1;
+        this.rUpperTargetX = 0.3;
+        this.rUpperTargetZ = 1.1;
+        this.lLowerTargetX = -0.8;
+        this.rLowerTargetX = -0.8;
         break;
       }
     }

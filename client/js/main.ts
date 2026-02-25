@@ -86,7 +86,7 @@ async function bootstrap(): Promise<void> {
   const screen = new Screen();
 
   // Load VRM
-  const vrm = await loadAvatar('/models/botbunny.vrm');
+  const vrm = await loadAvatar('/models/fem_vroid.vrm');
   if (vrm) {
     animator = new AvatarAnimator(vrm);
     lipSync = new LipSync(vrm);
