@@ -27,9 +27,9 @@ export class AvatarAnimator {
   private headTargetZ = 0;
   private spineTargetX = 0;
   private chestTargetX = 0;
-  // CORRECT AXIS: Y rotation swings arms. Left Y+ = down, Right Y- = down
-  private lUpperTargetX = 0; private lUpperTargetY = 1.4; private lUpperTargetZ = 0;
-  private rUpperTargetX = 0; private rUpperTargetY = -1.4; private rUpperTargetZ = 0;
+  // Y axis = arm swing. Left Y- = down/forward, Right Y+ = down/forward
+  private lUpperTargetX = 0; private lUpperTargetY = -1.4; private lUpperTargetZ = 0;
+  private rUpperTargetX = 0; private rUpperTargetY = 1.4; private rUpperTargetZ = 0;
   private lLowerTargetX = 0;
   private rLowerTargetX = 0;
 
@@ -158,10 +158,10 @@ export class AvatarAnimator {
         this.spineTargetX = Math.sin(s * 0.6) * 0.02;
         this.chestTargetX = Math.sin(s * 0.5) * 0.03;
         this.lUpperTargetX = 0;
-        this.lUpperTargetY = 1.4 + Math.sin(s * 0.3) * 0.03;
+        this.lUpperTargetY = -1.4 + Math.sin(s * 0.3) * 0.03;
         this.lUpperTargetZ = 0;
         this.rUpperTargetX = 0;
-        this.rUpperTargetY = -1.4 - Math.sin(s * 0.3) * 0.03;
+        this.rUpperTargetY = 1.4 - Math.sin(s * 0.3) * 0.03;
         this.rUpperTargetZ = 0;
         this.lLowerTargetX = -0.3;
         this.rLowerTargetX = -0.3;
@@ -175,10 +175,10 @@ export class AvatarAnimator {
         this.spineTargetX = 0.04;
         this.chestTargetX = 0.02;
         this.lUpperTargetX = 0;
-        this.lUpperTargetY = 1.3;
+        this.lUpperTargetY = -1.3;
         this.lUpperTargetZ = 0;
-        this.rUpperTargetX = -0.5;  // arm forward
-        this.rUpperTargetY = -0.5;  // partially raised
+        this.rUpperTargetX = -0.5;
+        this.rUpperTargetY = 0.5;
         this.rUpperTargetZ = 0;
         this.lLowerTargetX = -0.3;
         this.rLowerTargetX = -1.4;  // elbow bent
@@ -194,10 +194,10 @@ export class AvatarAnimator {
         this.chestTargetX = 0.04;
         // Arms forward for keyboard
         this.lUpperTargetX = -0.5 + Math.sin(this.typingPhase) * 0.05;
-        this.lUpperTargetY = 0.8;
+        this.lUpperTargetY = -0.8;
         this.lUpperTargetZ = 0;
         this.rUpperTargetX = -0.5 + Math.sin(this.typingPhase + Math.PI) * 0.05;
-        this.rUpperTargetY = -0.8;
+        this.rUpperTargetY = 0.8;
         this.rUpperTargetZ = 0;
         this.lLowerTargetX = -1.2 + Math.sin(this.typingPhase) * 0.06;
         this.rLowerTargetX = -1.2 + Math.sin(this.typingPhase + Math.PI) * 0.06;
@@ -212,10 +212,10 @@ export class AvatarAnimator {
         this.chestTargetX = 0.02;
         // Subtle gestures while talking
         this.lUpperTargetX = Math.sin(this.speakPhase * 0.7) * 0.15;
-        this.lUpperTargetY = 1.0 + Math.sin(this.speakPhase * 0.5) * 0.2;
+        this.lUpperTargetY = -1.0 + Math.sin(this.speakPhase * 0.5) * 0.2;
         this.lUpperTargetZ = 0;
         this.rUpperTargetX = Math.sin(this.speakPhase * 0.7 + 0.8) * 0.15;
-        this.rUpperTargetY = -1.0 - Math.sin(this.speakPhase * 0.5 + 0.8) * 0.2;
+        this.rUpperTargetY = 1.0 - Math.sin(this.speakPhase * 0.5 + 0.8) * 0.2;
         this.rUpperTargetZ = 0;
         this.lLowerTargetX = -0.4 + Math.sin(this.speakPhase) * 0.1;
         this.rLowerTargetX = -0.4 + Math.sin(this.speakPhase + Math.PI) * 0.1;
@@ -229,10 +229,10 @@ export class AvatarAnimator {
         this.spineTargetX = 0.04;
         this.chestTargetX = 0.02;
         this.lUpperTargetX = -0.4;
-        this.lUpperTargetY = 0.9;
+        this.lUpperTargetY = -0.9;
         this.lUpperTargetZ = 0;
         this.rUpperTargetX = -0.4;
-        this.rUpperTargetY = -0.9;
+        this.rUpperTargetY = 0.9;
         this.rUpperTargetZ = 0;
         this.lLowerTargetX = -0.8;
         this.rLowerTargetX = -0.8;
