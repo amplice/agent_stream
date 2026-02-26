@@ -55,13 +55,13 @@ export class Chat {
       }
     });
 
-    // Drift viewer count
-    setInterval(() => {
-      this.viewerCount += Math.floor(Math.random() * 3) - 1;
-      if (this.viewerCount < 8) this.viewerCount = 8;
-      if (this.viewerCount > 35) this.viewerCount = 35;
-      this.viewerCountEl.textContent = `${this.viewerCount} watching`;
-    }, 15000);
+    // Real viewer count from server
+    ws.on('viewer_count', (payload: any) => {
+      if (payload?.count !== undefined) {
+        this.viewerCount = payload.count;
+        this.viewerCountEl.textContent = `${this.viewerCount} watching`;
+      }
+    });
 
     // Listen for chat messages from server
     ws.on('chat_message', (payload: any) => {

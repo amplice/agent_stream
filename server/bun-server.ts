@@ -82,6 +82,8 @@ const server = Bun.serve<{ type: string }>({
         streamClients.add(ws);
         ws.send(JSON.stringify({ type: 'connected', ts: Date.now(), payload: {} }));
         console.log('[stream] client connected');
+        // Broadcast viewer count to all clients + bridge
+        broadcastViewerCount();
       } else {
         openclawWs = ws;
         console.log('[openclaw] connected');
@@ -131,8 +133,21 @@ const server = Bun.serve<{ type: string }>({
       streamClients.delete(ws);
       if (type === 'openclaw') openclawWs = null;
       console.log(`[${type}] disconnected`);
+      if (type === 'stream') broadcastViewerCount();
     },
   }
 });
+
+function broadcastViewerCount() {
+  const count = streamClients.size;
+  const msg = JSON.stringify({ type: 'viewer_count', ts: Date.now(), payload: { count } });
+  for (const client of streamClients) {
+    try { client.send(msg); } catch {}
+  }
+  // Also tell the bridge
+  if (openclawWs) {
+    try { openclawWs.send(msg); } catch {}
+  }
+}
 
 console.log(`Nox server (Bun native) on :${server.port}`);

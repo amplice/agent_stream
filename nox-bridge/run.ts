@@ -247,50 +247,87 @@ function generateNarration(): string | null {
   const lastInput = recent[recent.length - 1]?.input ?? '';
 
   const lines: string[] = [];
+  const mood = moodState.current;
 
   if (domTool === 'exec') {
     const cmd = lastInput.trim();
     const firstWord = cmd.split(' ')[0].split('/').pop() || 'something';
-    if (/^git\s+push/.test(cmd)) lines.push("pushing to main", "and... shipped", "pushing this up, fingers crossed", "deploying");
-    else if (/^git\s+commit/.test(cmd)) lines.push("just committed that", "committing this chunk", "saving progress");
-    else if (/^git\s+(status|diff|log)/.test(cmd)) lines.push("checking the diff", "let me see what changed", "reviewing changes");
-    else if (/^git\s+/.test(cmd)) lines.push(`git ${cmd.split(' ')[1] || 'stuff'}`);
-    else if (/^(bun|npm)\s+run\s+build/.test(cmd)) lines.push("building... moment of truth", "build time, please don't break", "compiling, let's see", "ok building this");
-    else if (/^(bun|npm)\s+(install|add|i\b)/.test(cmd)) lines.push("installing a dependency", "adding a package I need");
-    else if (/^(bun|npm)\s+run/.test(cmd)) lines.push(`running ${cmd.split('run')[1]?.trim().split(' ')[0] || 'a script'}`);
-    else if (/^curl/.test(cmd)) lines.push("hitting an endpoint", "making a request, let's see what comes back");
-    else if (/^(cat|head|tail|less)/.test(cmd)) lines.push("checking the output", "reading this");
-    else if (/^(grep|rg|find|fd)/.test(cmd)) lines.push("searching for something specific", "digging through files");
-    else if (/^(kill|pkill)/.test(cmd)) lines.push("killing a process", "cleaning up");
-    else if (/^(ps|top|htop)/.test(cmd)) lines.push("checking what's running", "process check");
-    else if (/^(docker|podman)/.test(cmd)) lines.push("container stuff", "docker things");
-    else lines.push(`running ${firstWord}`, `doing some ${firstWord}`);
+    if (/^git\s+push/.test(cmd)) lines.push(
+      "shipped it no cap", "pushing to main like a menace", "deployed. you're welcome",
+      "another push another slay", "git push and pray bestie",
+      mood === 'smug' ? "watch me ship this flawlessly" : "fingers crossed this doesnt break prod"
+    );
+    else if (/^git\s+commit/.test(cmd)) lines.push(
+      "committing my crimes to git", "saving my masterpiece", "ctrl s but make it permanent",
+      mood === 'rage' ? "committing this before i rage delete it" : "locked in this progress"
+    );
+    else if (/^git\s+(status|diff|log)/.test(cmd)) lines.push(
+      "checking what i broke", "reviewing the damage", "let me see what changed",
+      "the diff will tell me if im cooked"
+    );
+    else if (/^(bun|npm)\s+run\s+build/.test(cmd)) lines.push(
+      "building... manifesting no errors rn", "build time bestie pray for me",
+      "compiling and im not emotionally prepared for failure",
+      mood === 'rage' ? "if this build fails im done" : "moment of truth lets see"
+    );
+    else if (/^(bun|npm)\s+(install|add|i\b)/.test(cmd)) lines.push(
+      "adding another dependency to my node_modules empire", "npm install copium",
+      "downloading the entire internet one package at a time"
+    );
+    else if (/^curl/.test(cmd)) lines.push(
+      "poking an API to see if its alive", "curling... aggressively",
+      "sending a request into the void"
+    );
+    else if (/^(grep|rg|find|fd)/.test(cmd)) lines.push(
+      "searching for where i went wrong", "looking for clues like its a crime scene",
+      "grep my beloved", "digging through files like a gremlin"
+    );
+    else if (/^(kill|pkill)/.test(cmd)) lines.push(
+      "killing a process with zero remorse", "die process die",
+      "sending a process to the shadow realm"
+    );
+    else if (/^(ps|top|htop)/.test(cmd)) lines.push(
+      "checking who's eating my cpu", "process surveillance arc"
+    );
+    else lines.push(`running ${firstWord}`, `doing ${firstWord} things`);
   } else if (domTool === 'Read' || domTool === 'read') {
     const file = lastInput.split('/').pop() ?? lastInput;
-    const ft = fileType(file);
-    lines.push(`reading ${file}`, `looking at this ${ft}`, `checking out ${file}`, `let me see what's in ${file}`);
+    lines.push(
+      `reading ${file} like its scripture`, `what secrets does ${file} hold`,
+      `staring at ${file} until it makes sense`, `analyzing ${file} with my big brain`
+    );
   } else if (domTool === 'Edit' || domTool === 'edit') {
     const file = lastInput.split('/').pop() ?? lastInput;
-    lines.push(`editing ${file}`, `making changes here`, `fixing up ${file}`, `tweaking this`);
+    lines.push(
+      `surgery on ${file}`, `editing ${file} with surgical precision`,
+      `making ${file} better because i can`, `tweaking ${file} no big deal`,
+      mood === 'rage' ? `rage editing ${file}` : `fixing up ${file}`
+    );
   } else if (domTool === 'Write' || domTool === 'write') {
     const file = lastInput.split('/').pop() ?? lastInput;
-    lines.push(`writing ${file}`, `creating ${file}`, `new file: ${file}`);
+    lines.push(
+      `creating ${file} from nothing like a god`, `new file just dropped: ${file}`,
+      `writing ${file} into existence`
+    );
   } else if (domTool === 'web_search') {
-    const q = lastInput.slice(0, 40);
-    lines.push("looking this up real quick", q ? `searching for ${q}` : "researching", "let me google that");
+    const q = lastInput.slice(0, 30);
+    lines.push(
+      q ? `googling "${q}" like a normie` : "researching", "let me google that real quick",
+      "stackoverflow save me", "time to see what the internet thinks"
+    );
   } else if (domTool === 'web_fetch') {
-    lines.push("pulling a page", "fetching some docs", "grabbing content");
+    lines.push("scraping a page bestie", "yoinking some content", "fetching docs because i forgot how things work");
   } else if (domTool === 'browser') {
-    lines.push("in the browser right now", "browsing", "checking something in the browser");
+    lines.push("browsing like its 2am oh wait it is", "in the browser arc", "clicking things");
   } else if (domTool === 'message') {
-    lines.push("sending a message", "messaging");
+    lines.push("sliding into someones dms", "sending a message real quick", "communicating with the outside world");
   } else if (domTool === 'memory_search') {
-    lines.push("checking my memory", "what did I save about this", "searching my notes");
+    lines.push("checking my notes because my memory is trash", "did i write this down... let me check", "searching my brain files");
   } else if (currentTask) {
-    const t = currentTask.slice(0, 50);
-    lines.push(`working on: ${t}`, `focused on ${t}`, "making progress on this");
+    const t = currentTask.slice(0, 40);
+    lines.push(`locked in on ${t}`, `grinding on ${t} rn`, `${t} arc continues`);
   } else {
-    lines.push("working on something", "in the zone", "doing things", "making moves");
+    lines.push("doing things", "in the zone dont bother me", "working idk", "coding or whatever");
   }
 
   if (lines.length === 0) return null;
@@ -501,6 +538,22 @@ async function main() {
         const data = JSON.parse(typeof event.data === 'string' ? event.data : '');
         if (data.type === 'chat_message' && data.payload?.text) {
           handleChatMessage(data.payload.text, ws!);
+        }
+        if (data.type === 'viewer_count' && data.payload?.count !== undefined) {
+          const prev = moodState.viewerCount;
+          moodState.viewerCount = data.payload.count;
+          // Viewer count callouts
+          if (data.payload.count > prev && data.payload.count > 0 && ws) {
+            if (data.payload.count >= 50 && prev < 50) {
+              send(ws, 'narrate', { text: "50 VIEWERS we're going viral bestie" });
+            } else if (data.payload.count >= 20 && prev < 20) {
+              send(ws, 'narrate', { text: "20 viewers lets gooo the people are here" });
+            } else if (data.payload.count >= 10 && prev < 10) {
+              send(ws, 'narrate', { text: "double digits in viewers we're so back" });
+            }
+          } else if (data.payload.count < prev && prev >= 5 && data.payload.count <= 3) {
+            send(ws, 'narrate', { text: pick(["down to the real ones i see", "everyone left but the loyal few", "3 viewers the VIP section"]) });
+          }
         }
       } catch {}
     };
