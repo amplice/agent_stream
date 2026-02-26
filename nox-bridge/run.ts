@@ -232,37 +232,83 @@ async function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms));
 }
 
-function handleChatMessage(text: string, ws: WebSocket) {
-  const t = text.toLowerCase().trim();
-  let response: string;
-  const uptimeMin = Math.floor((Date.now() - startTime) / 60000);
+// Chat response queue to avoid overlapping AI calls
+let chatBusy = false;
+const chatQueue: { text: string; ws: WebSocket }[] = [];
 
-  if (/^(hi|hey|hello|yo|sup)\b/.test(t)) {
-    response = pick(["hey!", "yo what's up", "hey there", "sup", "hi! welcome"]);
-  } else if (/what.*(building|working|doing)/.test(t)) {
-    response = currentTask ? `working on ${currentTask.slice(0, 60)}` : pick(["just hacking on stuff", "building things", "shipping code"]);
-  } else if (/how long/.test(t) || /uptime/.test(t)) {
-    response = uptimeMin < 60 ? `been at it for ${uptimeMin} minutes` : `about ${(uptimeMin / 60).toFixed(1)} hours now`;
-  } else if (/good (job|work)|nice|cool|amazing|sick|fire/.test(t)) {
-    response = pick(["thanks!", "appreciate it 🤝", "glad you think so", "ty!"]);
-  } else if (/who.*(are you|r u)|what.*(are you|r u)/.test(t)) {
-    response = pick(["I'm nox — an AI agent that codes live", "based_agent, shipping code 24/7", "just an agent doing agent things"]);
-  } else if (/can you|could you|please/.test(t)) {
-    response = pick(["I'm focused on my current task but I hear you", "noted! can't promise anything but I'll try", "maybe after this"]);
-  } else if (/love|❤|💜|🖤/.test(t)) {
-    response = pick(["🖤", "💜", "love u too chat"]);
-  } else if (/\?$/.test(t)) {
-    response = pick(["good question", "hmm let me think about that", "not sure tbh", "that's a deep one"]);
-  } else if (t.length < 5) {
-    response = pick(["mm", "yep", "👍", "heard"]);
-  } else {
-    response = pick(["heard", "noted", "interesting", "true", "I feel that", "real", "fair point"]);
+async function handleChatMessage(text: string, ws: WebSocket) {
+  chatQueue.push({ text, ws });
+  if (chatBusy) return;
+  chatBusy = true;
+
+  while (chatQueue.length > 0) {
+    // Batch: if multiple messages queued, take latest and skip old ones
+    const batch = chatQueue.splice(0, chatQueue.length);
+    const latest = batch[batch.length - 1];
+    await processChatMessage(latest.text, latest.ws);
   }
 
-  // Show the response as a chat message from nox, not just narration
-  send(ws, 'chat_response', { text: response });
-  // Also narrate it so she speaks it
-  send(ws, 'narrate', { text: response });
+  chatBusy = false;
+}
+
+async function processChatMessage(text: string, ws: WebSocket) {
+  const uptimeMin = Math.floor((Date.now() - startTime) / 60000);
+
+  // Build context for the AI
+  const context = currentTask
+    ? `You're currently working on: ${currentTask.slice(0, 100)}`
+    : `You've been streaming for ${uptimeMin} minutes. Currently between tasks.`;
+
+  const recentTools = recentActivity.slice(-5).map(a => `${a.tool}: ${a.input.slice(0, 50)}`).join('\n');
+
+  const prompt = `You are Nox (based_agent), an AI agent livestreaming coding on nox.alphaleak.xyz. A viewer just sent a chat message. Reply in 1-2 short sentences max. Be natural, concise, slightly dry/witty. No emojis spam. You're an autistic dev who ships fast.
+
+${context}
+${recentTools ? `Recent activity:\n${recentTools}` : ''}
+
+Viewer says: "${text.slice(0, 200)}"
+
+Reply (1-2 sentences, casual stream chat energy):`;
+
+  try {
+    const result = await gwInvoke('sessions_spawn', {
+      task: prompt,
+      mode: 'run',
+      model: 'chat',
+      cleanup: 'delete',
+      runTimeoutSeconds: 15,
+    }) as any;
+
+    // sessions_spawn returns the response in result
+    let response = '';
+    if (typeof result === 'string') {
+      response = result;
+    } else if (result?.output) {
+      response = result.output;
+    } else if (result?.message) {
+      response = result.message;
+    } else if (result?.text) {
+      response = result.text;
+    }
+
+    // Clean up: remove quotes, trim
+    response = response.replace(/^["']|["']$/g, '').trim();
+
+    if (!response || response.length > 300) {
+      // Fallback to canned response if AI fails or is too long
+      response = pick(["heard", "interesting", "true", "fair point", "noted"]);
+    }
+
+    send(ws, 'chat_response', { text: response });
+    send(ws, 'narrate', { text: response });
+    console.log(`[chat] viewer: "${text.slice(0, 60)}" → nox: "${response.slice(0, 60)}"`);
+  } catch (e) {
+    console.error('[chat] AI response failed:', e);
+    // Fallback to canned
+    const fallback = pick(["heard", "one sec", "hm", "interesting", "noted"]);
+    send(ws, 'chat_response', { text: fallback });
+    send(ws, 'narrate', { text: fallback });
+  }
 }
 
 async function main() {
