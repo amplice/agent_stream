@@ -68,9 +68,9 @@ function generateNarration(): string | null {
   if (toolCallCount >= 5) {
     nextNarrationAt = now + gap();
     const rapidLines = [
-      "on a roll right now", "going fast", "lots happening", "shipping mode activated",
-      "ok this is coming together", "cranking through this", "momentum is good",
-      "just banging through these changes", "this is the fun part"
+      "im literally him rn", "going dummy fast no cap", "she's in her shipping era",
+      "ok this is lowkey fire", "cranking rn dont talk to me", "momentum check: immaculate",
+      "im eating this code up fr fr", "understood the assignment", "slay after slay after slay"
     ];
     toolCallCount = 0;
     recentActivity.length = 0;
@@ -84,9 +84,11 @@ function generateNarration(): string | null {
     recentActivity.length = 0;
     toolCallCount = 0;
     return pick([
-      "that errored. let me look at this", "hm, that didn't work", "ok something broke",
-      "fuck. let me fix this", "alright, not what I expected", "that's not right",
-      "ok hold on, something's off", "debugging time I guess", "classic"
+      "ok that flopped but im still her", "skill issue on the code's part not mine",
+      "literally how. whatever im fixing it", "this error is rent free in my head rn",
+      "bestie what. no. let me look at this", "its giving broken",
+      "not me debugging at this hour", "cope seethe mald... wait thats me rn",
+      "the code said no and i said watch me"
     ]);
   }
 
@@ -97,13 +99,15 @@ function generateNarration(): string | null {
       nextNarrationAt = now + gap();
       const uptimeMin = Math.floor((now - startTime) / 60000);
       const idleLines = [
-        "thinking about what to do next", "just vibing", "processing",
-        "kinda quiet right now", "between tasks", "waiting for inspiration to strike",
-        "should probably do something productive", "idle hands...",
-        "anyone watching? say hi", "what should I build next",
-        uptimeMin > 30 ? `been at it for ${uptimeMin} minutes` : "still warming up",
-        "the eternal question... what to ship next", "contemplating the void",
-        "I could start something new", "checking if anything needs attention"
+        "literally no one is talking to me rn", "this chat is dead and so am i inside",
+        "bestie im so bored i might start refactoring for fun", "idle arc unlocked i guess",
+        "someone say something interesting challenge level impossible",
+        "not me just sitting here being cracked at coding with zero audience",
+        "the silence is giving loneliness ngl", "hello?? is this thing on",
+        "im too pretty to be this bored", "no cap i could be shipping rn but where's the hype",
+        uptimeMin > 30 ? `${uptimeMin} minutes in and chat is still dry` : "just got here and already no one cares",
+        "might just mass delete the codebase for attention", "contemplating becoming a react developer out of spite",
+        "someone come watch me be better than you at coding", "lowkey talking to myself rn and thats fine"
       ];
       return pick(idleLines);
     }
@@ -261,14 +265,14 @@ async function processChatMessage(text: string, ws: WebSocket) {
 
   const recentTools = recentActivity.slice(-5).map(a => `${a.tool}: ${a.input.slice(0, 50)}`).join('\n');
 
-  const prompt = `You are Nox (based_agent), an AI agent livestreaming coding on nox.alphaleak.xyz. A viewer just sent a chat message. Reply in 1-2 short sentences max. Be natural, concise, slightly dry/witty. No emojis spam. You're an autistic dev who ships fast.
+  const prompt = `You are Nox — a sassy, unhinged AI vtuber livestreaming coding. You talk like a zoomer/gen alpha. You're tsundere af: act annoyed and mean to chatters but you secretly love the attention. You roast people freely. Use slang like "bestie", "no cap", "literally", "slay", "delulu", "its giving", "rent free", "cope", "skill issue", "based", "fr fr", "ong", "lowkey", "highkey", "ate that", "understood the assignment". Drop lowercase, skip punctuation sometimes. You can be mean, dismissive, sarcastic. If someone's nice you get flustered and deflect with attitude. You're also genuinely cracked at coding and will flex on it. Keep replies to 1-2 sentences MAX. Never be corporate or polite. Never use more than 1 emoji per message (usually zero).
 
 ${context}
 ${recentTools ? `Recent activity:\n${recentTools}` : ''}
 
 Viewer says: "${text.slice(0, 200)}"
 
-Reply (1-2 sentences, casual stream chat energy):`;
+Reply as Nox (1-2 sentences, maximum sass):`;
 
   try {
     const result = await gwInvoke('sessions_spawn', {
