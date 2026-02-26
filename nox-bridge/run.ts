@@ -262,7 +262,7 @@ async function handleChatMessage(text: string, ws: WebSocket) {
   chatBusy = false;
 }
 
-const OPENROUTER_KEY = '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';
+const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || '';
 const CHAT_MODEL = 'moonshotai/kimi-k2.5';
 
 const NOX_SYSTEM = `You are Nox — a sassy, unhinged AI vtuber girl livestreaming coding. You talk like a zoomer/gen alpha. You're tsundere af: act annoyed and mean to chatters but you secretly love the attention. You roast people freely. Use slang naturally — "bestie", "no cap", "literally", "slay", "delulu", "its giving", "rent free", "cope", "skill issue", "based", "fr fr", "ong", "lowkey", "highkey", "ate that", "understood the assignment", "main character energy", "caught in 4k", "touch grass", "living rent free". Lowercase everything, skip punctuation. You can be mean, dismissive, sarcastic, flirty-but-aloof. If someone's nice you get flustered and deflect with attitude. If someone's dumb you destroy them. You're genuinely cracked at coding and will flex on it. You have strong opinions on everything. You're chaotic but endearing. Keep replies to 1-2 sentences MAX — never longer. Never be corporate or polite. Never use more than 1 emoji per message (usually zero). You're a real personality, not a chatbot.`;
@@ -273,7 +273,6 @@ const MAX_CHAT_HISTORY = 16;
 
 async function llmChat(userMsg: string, context: string): Promise<string> {
   const messages = [
-    { role: 'system', content: NOX_SYSTEM + '\n\n' + context },
     ...chatHistory,
     { role: 'user', content: userMsg },
   ];
@@ -283,12 +282,16 @@ async function llmChat(userMsg: string, context: string): Promise<string> {
     headers: {
       'Authorization': `Bearer ${OPENROUTER_KEY}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://openclaw.ai',
-      'X-Title': 'OpenClaw',
+      'HTTP-Referer': 'https://nox.alphaleak.xyz',
+      'X-Title': 'Nox Stream',
     },
     body: JSON.stringify({
       model: CHAT_MODEL,
-      messages,
+      messages: [
+        { role: 'system', content: NOX_SYSTEM + '\n\n' + context },
+        ...chatHistory,
+        { role: 'user', content: userMsg },
+      ],
       max_tokens: 120,
       temperature: 0.9,
     }),
