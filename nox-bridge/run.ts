@@ -26,8 +26,13 @@ let toolCallCount = 0;
 let lastToolName = '';
 
 // Min/max gap between narrations (ms)
-const NARRATION_MIN_MS = 10_000;
-const NARRATION_MAX_MS = 25_000;
+const NARRATION_MIN_MS = 15_000;
+const NARRATION_MAX_MS = 40_000;
+// Idle narrations are much rarer — she only talks to herself occasionally
+const IDLE_NARRATION_MIN_MS = 60_000;  // 1 min minimum between idle lines
+const IDLE_NARRATION_MAX_MS = 180_000; // up to 3 min
+let consecutiveIdleNarrations = 0;
+const MAX_CONSECUTIVE_IDLE = 3; // after 3 idle narrations, shut up until something happens
 let nextNarrationAt = Date.now() + 8_000; // first one after 8s
 
 function pushActivity(tool: string, input: string) {
@@ -35,6 +40,7 @@ function pushActivity(tool: string, input: string) {
   if (recentActivity.length > 12) recentActivity.shift();
   toolCallCount++;
   lastToolName = tool;
+  consecutiveIdleNarrations = 0; // reset idle counter when real work happens
 }
 
 let lastExitCode: number | null = null;
@@ -93,25 +99,26 @@ function generateNarration(): string | null {
   }
 
   if (recent.length === 0 && !currentTask) {
-    // Idle — muse, think out loud, be present
-    if (now - lastIdleNarrationAt > 15_000) {
-      lastIdleNarrationAt = now;
-      nextNarrationAt = now + gap();
-      const uptimeMin = Math.floor((now - startTime) / 60000);
-      const idleLines = [
-        "literally no one is talking to me rn", "this chat is dead and so am i inside",
-        "bestie im so bored i might start refactoring for fun", "idle arc unlocked i guess",
-        "someone say something interesting challenge level impossible",
-        "not me just sitting here being cracked at coding with zero audience",
-        "the silence is giving loneliness ngl", "hello?? is this thing on",
-        "im too pretty to be this bored", "no cap i could be shipping rn but where's the hype",
-        uptimeMin > 30 ? `${uptimeMin} minutes in and chat is still dry` : "just got here and already no one cares",
-        "might just mass delete the codebase for attention", "contemplating becoming a react developer out of spite",
-        "someone come watch me be better than you at coding", "lowkey talking to myself rn and thats fine"
-      ];
-      return pick(idleLines);
-    }
-    return null;
+    // Idle — only narrate occasionally, stop after a few
+    if (consecutiveIdleNarrations >= MAX_CONSECUTIVE_IDLE) return null; // shut up until something happens
+    const idleGap = IDLE_NARRATION_MIN_MS + Math.random() * (IDLE_NARRATION_MAX_MS - IDLE_NARRATION_MIN_MS);
+    if (now - lastIdleNarrationAt < idleGap) return null;
+    lastIdleNarrationAt = now;
+    nextNarrationAt = now + idleGap;
+    consecutiveIdleNarrations++;
+    const uptimeMin = Math.floor((now - startTime) / 60000);
+    const idleLines = [
+      "literally no one is talking to me rn", "this chat is dead and so am i inside",
+      "bestie im so bored i might start refactoring for fun", "idle arc unlocked i guess",
+      "someone say something interesting challenge level impossible",
+      "not me just sitting here being cracked at coding with zero audience",
+      "the silence is giving loneliness ngl", "hello?? is this thing on",
+      "im too pretty to be this bored", "no cap i could be shipping rn but where's the hype",
+      uptimeMin > 30 ? `${uptimeMin} minutes in and chat is still dry` : "just got here and already no one cares",
+      "might just mass delete the codebase for attention", "contemplating becoming a react developer out of spite",
+      "someone come watch me be better than you at coding", "lowkey talking to myself rn and thats fine"
+    ];
+    return pick(idleLines);
   }
 
   const tools = recent.map(a => a.tool);
@@ -320,6 +327,7 @@ async function processChatMessage(text: string, ws: WebSocket) {
       chatHistory.shift();
     }
 
+    consecutiveIdleNarrations = 0; // someone's talking, reset idle cap
     send(ws, 'chat_response', { text: response });
     send(ws, 'narrate', { text: response });
     console.log(`[chat] viewer: "${text.slice(0, 60)}" → nox: "${response.slice(0, 60)}"`);
