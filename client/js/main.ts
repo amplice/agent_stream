@@ -201,6 +201,14 @@ async function bootstrap(): Promise<void> {
     if (payload?.text) chat.addMessage('nox', payload.text);
   });
 
+  // Mood changes
+  ws.on('mood', (payload: any) => {
+    if (animator && payload?.mood) {
+      animator.setMood(payload.mood);
+      console.log(`[main] mood → ${payload.mood}`);
+    }
+  });
+
   // Narration — fires in any state
   ws.on('narrate', async (payload: any) => {
     if (!payload?.text) return;

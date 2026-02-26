@@ -25,6 +25,7 @@ function smoothNoise(t: number, seed: number): number {
 }
 
 export type StateName = 'idle' | 'thinking' | 'typing' | 'speaking' | 'executing';
+export type MoodName = 'lonely' | 'chill' | 'tsundere' | 'flustered' | 'rage' | 'smug' | 'hype';
 
 // Speaking gesture library - each is a function of phase returning arm targets
 interface GestureFrame {
@@ -95,6 +96,7 @@ const IDLE_SUB_POSES: IdleSubPose[] = [
 export class AvatarAnimator {
   private vrm: VRM;
   private state: StateName = 'idle';
+  private mood: MoodName = 'chill';
   private time = 0;
 
   // Blink
@@ -240,6 +242,14 @@ export class AvatarAnimator {
         break;
     }
   }
+
+  setMood(mood: MoodName): void {
+    if (mood === this.mood) return;
+    console.log(`[animator] mood → ${mood}`);
+    this.mood = mood;
+  }
+
+  get currentMood(): MoodName { return this.mood; }
 
   update(dt: number): void {
     // Cap dt to avoid huge jumps
@@ -721,6 +731,21 @@ export class AvatarAnimator {
         base.happy = 0.05;
         base.angry = 0.08; // focused
         break;
+    }
+
+    // Blend mood into base expressions
+    const moodBlend: Record<string, Record<string, number>> = {
+      lonely:    { sad: 0.25, relaxed: 0.15 },
+      chill:     { relaxed: 0.15, happy: 0.05 },
+      tsundere:  { angry: 0.15, happy: 0.08 },
+      flustered: { surprised: 0.2, happy: 0.25 },
+      rage:      { angry: 0.4 },
+      smug:      { happy: 0.3, relaxed: 0.2 },
+      hype:      { happy: 0.4, surprised: 0.1 },
+    };
+    const moodExprs = moodBlend[this.mood] || {};
+    for (const [expr, val] of Object.entries(moodExprs)) {
+      base[expr] = Math.min(1, (base[expr] ?? 0) + val);
     }
 
     // Blend reaction

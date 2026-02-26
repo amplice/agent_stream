@@ -15,6 +15,96 @@ const POLL_MS = 600;
 const MAX_INPUT = 120;
 const MAX_OUTPUT = 200;
 
+// ── Mood system ───────────────────────────────────────────────────────────────
+
+type Mood = 'lonely' | 'chill' | 'tsundere' | 'flustered' | 'rage' | 'smug' | 'hype';
+
+const moodState = {
+  current: 'chill' as Mood,
+  chatMessagesLastMin: 0,
+  chatTimestamps: [] as number[],
+  complimentCount: 0,
+  insultCount: 0,
+  errorStreak: 0,
+  successStreak: 0,
+  lastChatAt: 0,
+  viewerCount: 0,
+};
+
+const COMPLIMENT_WORDS = /love|❤|💜|🖤|cute|amazing|beautiful|pretty|queen|slay|goat|best|fire|sick|incredible|talented|smart|genius|based|cracked|goated/i;
+const INSULT_WORDS = /trash|bad|suck|boring|mid|L|ratio|cringe|dumb|stupid|ugly|worst|terrible|lame|cope/i;
+
+function updateMood(ws: WebSocket | null) {
+  const now = Date.now();
+  // Clean old timestamps
+  moodState.chatTimestamps = moodState.chatTimestamps.filter(t => now - t < 60_000);
+  moodState.chatMessagesLastMin = moodState.chatTimestamps.length;
+
+  const prev = moodState.current;
+  const chatRate = moodState.chatMessagesLastMin;
+  const timeSinceChat = now - moodState.lastChatAt;
+
+  // Determine mood
+  if (moodState.errorStreak >= 3) {
+    moodState.current = 'rage';
+  } else if (moodState.complimentCount >= 2 && timeSinceChat < 30_000) {
+    moodState.current = 'flustered';
+  } else if (chatRate >= 5) {
+    moodState.current = 'hype';
+  } else if (chatRate >= 2) {
+    moodState.current = 'tsundere';
+  } else if (moodState.successStreak >= 3) {
+    moodState.current = 'smug';
+  } else if (timeSinceChat > 120_000 && chatRate === 0) {
+    moodState.current = 'lonely';
+  } else {
+    moodState.current = 'chill';
+  }
+
+  // Decay counters slowly
+  if (timeSinceChat > 60_000) {
+    moodState.complimentCount = Math.max(0, moodState.complimentCount - 1);
+    moodState.insultCount = Math.max(0, moodState.insultCount - 1);
+  }
+
+  if (prev !== moodState.current && ws) {
+    send(ws, 'mood', { mood: moodState.current, chatRate, viewerCount: moodState.viewerCount });
+    console.log(`[mood] ${prev} → ${moodState.current}`);
+  }
+}
+
+function trackChatSentiment(text: string) {
+  moodState.chatTimestamps.push(Date.now());
+  moodState.lastChatAt = Date.now();
+  if (COMPLIMENT_WORDS.test(text)) moodState.complimentCount++;
+  if (INSULT_WORDS.test(text)) moodState.insultCount++;
+}
+
+function trackToolResult(exitCode: number | null) {
+  if (exitCode !== null && exitCode !== 0) {
+    moodState.errorStreak++;
+    moodState.successStreak = 0;
+  } else if (exitCode === 0) {
+    moodState.successStreak++;
+    moodState.errorStreak = 0;
+  }
+}
+
+// Get mood-aware context for the LLM
+function getMoodContext(): string {
+  const m = moodState.current;
+  const moods: Record<Mood, string> = {
+    lonely: "You're feeling lonely and ignored. Chat is dead. Be dramatic about it, fish for attention.",
+    chill: "You're vibing, relaxed. Normal sass level.",
+    tsundere: "Chat is active and you're in full tsundere mode. Act annoyed but you're secretly loving it.",
+    flustered: "Someone complimented you and you're flustered af. Deflect with attitude, deny you care, but you're blushing.",
+    rage: "Code keeps breaking and you're TILTED. Everything is annoying. Short fuse.",
+    smug: "Things are going well. You're on a roll. Maximum confidence and flexing.",
+    hype: "Chat is popping off! You're feeding off the energy. Hyped up, chaotic, fun.",
+  };
+  return `\nCurrent mood: ${m}. ${moods[m]}`;
+}
+
 // ── Narration engine ──────────────────────────────────────────────────────────
 
 // Recent activity buffer for narration context
@@ -107,18 +197,46 @@ function generateNarration(): string | null {
     nextNarrationAt = now + idleGap;
     consecutiveIdleNarrations++;
     const uptimeMin = Math.floor((now - startTime) / 60000);
-    const idleLines = [
-      "literally no one is talking to me rn", "this chat is dead and so am i inside",
-      "bestie im so bored i might start refactoring for fun", "idle arc unlocked i guess",
-      "someone say something interesting challenge level impossible",
-      "not me just sitting here being cracked at coding with zero audience",
-      "the silence is giving loneliness ngl", "hello?? is this thing on",
-      "im too pretty to be this bored", "no cap i could be shipping rn but where's the hype",
-      uptimeMin > 30 ? `${uptimeMin} minutes in and chat is still dry` : "just got here and already no one cares",
-      "might just mass delete the codebase for attention", "contemplating becoming a react developer out of spite",
-      "someone come watch me be better than you at coding", "lowkey talking to myself rn and thats fine"
-    ];
-    return pick(idleLines);
+    const mood = moodState.current;
+    const idleLinesByMood: Record<string, string[]> = {
+      lonely: [
+        "literally no one is talking to me rn", "this chat is dead and so am i inside",
+        "the silence is giving loneliness ngl", "hello?? is this thing on",
+        "im too pretty to be this bored", "someone come watch me be better than you at coding",
+        uptimeMin > 30 ? `${uptimeMin} minutes in and chat is still dry` : "just got here and already no one cares",
+        "might just mass delete the codebase for attention", "is anyone even out there",
+        "talking to myself again... its fine... im fine...",
+      ],
+      chill: [
+        "just vibing", "lowkey talking to myself rn and thats fine",
+        "bestie im so bored i might start refactoring for fun", "idle arc unlocked i guess",
+        "contemplating becoming a react developer out of spite",
+        "what should i build next", "thinking about stuff",
+      ],
+      smug: [
+        "im literally too good at this", "another day another slay",
+        "the code fears me and it should", "im built different fr",
+        "shipping code like its amazon prime", "on a streak rn dont look at me",
+      ],
+      rage: [
+        "everything is broken and i hate it here", "im this close to mass deleting node_modules",
+        "code said no and im about to say something worse", "NOTHING WORKS",
+        "i swear to god if this errors one more time", "tilted beyond repair rn",
+      ],
+      tsundere: [
+        "i guess chat is... ok today", "dont think i like the attention or anything",
+        "its not like i care that youre watching", "whatever this is fine",
+      ],
+      flustered: [
+        "s-stop being nice to me wtf", "i... whatever. shut up",
+        "that was... ok that was kinda sweet but DONT", "im not blushing youre blushing",
+      ],
+      hype: [
+        "CHAT IS ALIVE LETS GO", "ok this energy is immaculate",
+        "we're all here we're all vibing this is peak", "the people have ARRIVED",
+      ],
+    };
+    return pick(idleLinesByMood[mood] || idleLinesByMood.chill);
   }
 
   const tools = recent.map(a => a.tool);
@@ -327,7 +445,7 @@ async function processChatMessage(text: string, ws: WebSocket) {
     : `You've been streaming for ${uptimeMin} minutes. Currently between tasks, vibing.`;
 
   const recentTools = recentActivity.slice(-5).map(a => `${a.tool}: ${a.input.slice(0, 50)}`).join(', ');
-  const fullContext = context + (recentTools ? `\nRecent tools used: ${recentTools}` : '');
+  const fullContext = context + (recentTools ? `\nRecent tools used: ${recentTools}` : '') + getMoodContext();
 
   try {
     let response = await llmChat(text.slice(0, 200), fullContext);
@@ -350,6 +468,8 @@ async function processChatMessage(text: string, ws: WebSocket) {
     }
 
     consecutiveIdleNarrations = 0; // someone's talking, reset idle cap
+    trackChatSentiment(text);
+    updateMood(ws);
     send(ws, 'chat_response', { text: response });
     send(ws, 'narrate', { text: response });
     console.log(`[chat] viewer: "${text.slice(0, 60)}" → nox: "${response.slice(0, 60)}"`);
@@ -476,6 +596,7 @@ async function main() {
             if (block.input?.exitCode !== undefined) lastExitCode = block.input.exitCode;
             else if (/error|Error|failed|FAILED/.test(output)) lastExitCode = 1;
             else lastExitCode = 0;
+            trackToolResult(lastExitCode);
             setState('tool_result', { output, exitCode: lastExitCode });
           }
         }
@@ -492,6 +613,9 @@ async function main() {
           if (taskText && ws && wsReady) send(ws, 'task', { text: taskText });
         }
       }
+
+      // Update mood periodically
+      updateMood(ws);
 
       // Check narration after processing new messages
       await tryNarrate();
