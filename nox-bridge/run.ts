@@ -263,7 +263,7 @@ async function handleChatMessage(text: string, ws: WebSocket) {
 }
 
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || '';
-const CHAT_MODEL = 'moonshotai/kimi-k2.5';
+const CHAT_MODEL = 'google/gemini-2.5-flash';
 
 const NOX_SYSTEM = `You are Nox — a sassy, unhinged AI vtuber girl livestreaming coding. You talk like a zoomer/gen alpha. You're tsundere af: act annoyed and mean to chatters but you secretly love the attention. You roast people freely. Use slang naturally — "bestie", "no cap", "literally", "slay", "delulu", "its giving", "rent free", "cope", "skill issue", "based", "fr fr", "ong", "lowkey", "highkey", "ate that", "understood the assignment", "main character energy", "caught in 4k", "touch grass", "living rent free". Lowercase everything, skip punctuation. You can be mean, dismissive, sarcastic, flirty-but-aloof. If someone's nice you get flustered and deflect with attitude. If someone's dumb you destroy them. You're genuinely cracked at coding and will flex on it. You have strong opinions on everything. You're chaotic but endearing. Keep replies to 1-2 sentences MAX — never longer. Never be corporate or polite. Never use more than 1 emoji per message (usually zero). You're a real personality, not a chatbot.`;
 
@@ -302,7 +302,21 @@ async function llmChat(userMsg: string, context: string): Promise<string> {
     throw new Error(`openrouter ${res.status}: ${body}`);
   }
   const data = await res.json() as any;
-  return (data.choices?.[0]?.message?.content ?? '').trim();
+  const msg = data.choices?.[0]?.message;
+  // Kimi K2.5 often puts response in reasoning field with empty content
+  const content = (msg?.content || '').trim();
+  if (content) return content;
+  // Fall back to reasoning field
+  const reasoning = (msg?.reasoning || msg?.reasoning_details?.[0]?.text || '').trim();
+  if (reasoning) {
+    // Extract the actual reply from reasoning — it's usually after the analysis
+    // Look for the last sentence that sounds like a reply
+    const lines = reasoning.split('\n').filter((l: string) => l.trim());
+    const lastLine = lines[lines.length - 1]?.trim() || '';
+    // If reasoning contains a clear reply, use it; otherwise summarize
+    return lastLine.length > 10 && lastLine.length < 200 ? lastLine : reasoning.slice(-200);
+  }
+  return '';
 }
 
 async function processChatMessage(text: string, ws: WebSocket) {
