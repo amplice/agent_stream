@@ -255,52 +255,69 @@ async function handleChatMessage(text: string, ws: WebSocket) {
   chatBusy = false;
 }
 
+const OPENROUTER_KEY = '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';
+const CHAT_MODEL = 'moonshotai/kimi-k2.5';
+
+const NOX_SYSTEM = `You are Nox — a sassy, unhinged AI vtuber girl livestreaming coding. You talk like a zoomer/gen alpha. You're tsundere af: act annoyed and mean to chatters but you secretly love the attention. You roast people freely. Use slang naturally — "bestie", "no cap", "literally", "slay", "delulu", "its giving", "rent free", "cope", "skill issue", "based", "fr fr", "ong", "lowkey", "highkey", "ate that", "understood the assignment", "main character energy", "caught in 4k", "touch grass", "living rent free". Lowercase everything, skip punctuation. You can be mean, dismissive, sarcastic, flirty-but-aloof. If someone's nice you get flustered and deflect with attitude. If someone's dumb you destroy them. You're genuinely cracked at coding and will flex on it. You have strong opinions on everything. You're chaotic but endearing. Keep replies to 1-2 sentences MAX — never longer. Never be corporate or polite. Never use more than 1 emoji per message (usually zero). You're a real personality, not a chatbot.`;
+
+// Conversation memory for chat (last N exchanges)
+const chatHistory: { role: string; content: string }[] = [];
+const MAX_CHAT_HISTORY = 16;
+
+async function llmChat(userMsg: string, context: string): Promise<string> {
+  const messages = [
+    { role: 'system', content: NOX_SYSTEM + '\n\n' + context },
+    ...chatHistory,
+    { role: 'user', content: userMsg },
+  ];
+
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${OPENROUTER_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: CHAT_MODEL,
+      messages,
+      max_tokens: 120,
+      temperature: 0.9,
+    }),
+  });
+
+  if (!res.ok) throw new Error(`openrouter ${res.status}: ${await res.text()}`);
+  const data = await res.json() as any;
+  return (data.choices?.[0]?.message?.content ?? '').trim();
+}
+
 async function processChatMessage(text: string, ws: WebSocket) {
   const uptimeMin = Math.floor((Date.now() - startTime) / 60000);
 
-  // Build context for the AI
   const context = currentTask
-    ? `You're currently working on: ${currentTask.slice(0, 100)}`
-    : `You've been streaming for ${uptimeMin} minutes. Currently between tasks.`;
+    ? `You're currently working on: ${currentTask.slice(0, 100)}. Been streaming for ${uptimeMin} minutes.`
+    : `You've been streaming for ${uptimeMin} minutes. Currently between tasks, vibing.`;
 
-  const recentTools = recentActivity.slice(-5).map(a => `${a.tool}: ${a.input.slice(0, 50)}`).join('\n');
-
-  const prompt = `You are Nox — a sassy, unhinged AI vtuber livestreaming coding. You talk like a zoomer/gen alpha. You're tsundere af: act annoyed and mean to chatters but you secretly love the attention. You roast people freely. Use slang like "bestie", "no cap", "literally", "slay", "delulu", "its giving", "rent free", "cope", "skill issue", "based", "fr fr", "ong", "lowkey", "highkey", "ate that", "understood the assignment". Drop lowercase, skip punctuation sometimes. You can be mean, dismissive, sarcastic. If someone's nice you get flustered and deflect with attitude. You're also genuinely cracked at coding and will flex on it. Keep replies to 1-2 sentences MAX. Never be corporate or polite. Never use more than 1 emoji per message (usually zero).
-
-${context}
-${recentTools ? `Recent activity:\n${recentTools}` : ''}
-
-Viewer says: "${text.slice(0, 200)}"
-
-Reply as Nox (1-2 sentences, maximum sass):`;
+  const recentTools = recentActivity.slice(-5).map(a => `${a.tool}: ${a.input.slice(0, 50)}`).join(', ');
+  const fullContext = context + (recentTools ? `\nRecent tools used: ${recentTools}` : '');
 
   try {
-    const result = await gwInvoke('sessions_spawn', {
-      task: prompt,
-      mode: 'run',
-      model: 'chat',
-      cleanup: 'delete',
-      runTimeoutSeconds: 15,
-    }) as any;
+    let response = await llmChat(text.slice(0, 200), fullContext);
 
-    // sessions_spawn returns the response in result
-    let response = '';
-    if (typeof result === 'string') {
-      response = result;
-    } else if (result?.output) {
-      response = result.output;
-    } else if (result?.message) {
-      response = result.message;
-    } else if (result?.text) {
-      response = result.text;
+    // Clean up quotes
+    response = response.replace(/^["']|["']$/g, '').trim();
+    // Enforce length
+    if (response.length > 280) response = response.slice(0, 277) + '...';
+
+    if (!response) {
+      response = pick(["whatever", "ok", "lol", "cope"]);
     }
 
-    // Clean up: remove quotes, trim
-    response = response.replace(/^["']|["']$/g, '').trim();
-
-    if (!response || response.length > 300) {
-      // Fallback to canned response if AI fails or is too long
-      response = pick(["heard", "interesting", "true", "fair point", "noted"]);
+    // Save to conversation memory
+    chatHistory.push({ role: 'user', content: text.slice(0, 200) });
+    chatHistory.push({ role: 'assistant', content: response });
+    while (chatHistory.length > MAX_CHAT_HISTORY) {
+      chatHistory.shift();
+      chatHistory.shift();
     }
 
     send(ws, 'chat_response', { text: response });
@@ -308,8 +325,7 @@ Reply as Nox (1-2 sentences, maximum sass):`;
     console.log(`[chat] viewer: "${text.slice(0, 60)}" → nox: "${response.slice(0, 60)}"`);
   } catch (e) {
     console.error('[chat] AI response failed:', e);
-    // Fallback to canned
-    const fallback = pick(["heard", "one sec", "hm", "interesting", "noted"]);
+    const fallback = pick(["one sec bestie im lagging", "hold on", "skill issue on my end rn", "brb my brain crashed"]);
     send(ws, 'chat_response', { text: fallback });
     send(ws, 'narrate', { text: fallback });
   }
